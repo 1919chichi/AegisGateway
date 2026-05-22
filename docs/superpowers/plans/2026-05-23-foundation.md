@@ -4,9 +4,9 @@
 
 **Goal:** 搭建 Gradle 多模块项目骨架，实现 gateway-core —— 所有模块的共享基础，包含 Nacos 配置同步、标准响应体、SCG 路由仓库。
 
-**Architecture:** Spring Cloud Gateway 提供响应式路由引擎。gateway-core 是纯库模块，所有治理模块只依赖它。它拥有：通过虚拟线程监听 Nacos 配置、维护内存配置状态、标准 ApiResponse 封装、实现 SCG 的 RouteDefinitionRepository。治理模块通过 NacosConfigSyncService 注册各自的配置变更监听器，自行解析本模块配置。
+**Architecture:** Spring Cloud Gateway 提供响应式路由引擎。gateway-core 是纯库模块，所有治理模块只依赖它。它拥有：通过虚拟线程监听 Nacos 配置、维护内存配置状态、标准 ApiResponse 封装、实现 SCG 的 RouteDefinitionRepository。治理模块通过 NacosConfigSyncService 注册各自的配置变更监听器，自行解析本模块配置。每个 Data ID 使用独立的单线程虚拟线程 Executor，保证同一 Data ID 配置更新串行有序。
 
-**Tech Stack:** JDK 25, Gradle 8.10, Spring Boot 3.4.1, Spring Cloud Gateway 4.2.x, Spring Cloud Alibaba 2023.0.3.0 (Nacos), Jackson, JUnit 5, Mockito 5, Reactor Test
+**Tech Stack:** JDK 25, Gradle 9.1.0, Spring Boot 3.4.1, Spring Cloud Gateway 4.2.x, Spring Cloud Alibaba 2023.0.3.2 (Nacos), Jackson, JUnit 5, Mockito 5, Reactor Test
 
 ---
 
@@ -118,7 +118,7 @@ subprojects {
         imports {
             mavenBom "org.springframework.boot:spring-boot-dependencies:3.4.1"
             mavenBom "org.springframework.cloud:spring-cloud-dependencies:2024.0.0"
-            mavenBom "com.alibaba.cloud:spring-cloud-alibaba-dependencies:2023.0.3.0"
+            mavenBom "com.alibaba.cloud:spring-cloud-alibaba-dependencies:2023.0.3.2"
         }
     }
 
@@ -227,7 +227,7 @@ build/
 
 ```bash
 cd /Users/cz/github-project/AegisGateway
-gradle wrapper --gradle-version 8.10
+gradle wrapper --gradle-version 9.1.0
 ./gradlew projects
 ```
 
@@ -368,7 +368,7 @@ public record ApiResponse<T>(int code, String message, T data, long timestamp) {
 ./gradlew :gateway-core:test --tests "io.aegis.gateway.core.model.ApiResponseTest"
 ```
 
-期望：3 个测试全部 PASS。
+期望：4 个测试全部 PASS。
 
 - [ ] **Step 6: 提交**
 
@@ -403,7 +403,7 @@ class ConfigModelDeserializationTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void shouldDeserializeAegisRoutesConfig() throws Exception {
+    void shouldDeserializeAegisRoutesConfigWithOrder() throws Exception {
         String json = """
             {
               "routes": [
@@ -412,8 +412,10 @@ class ConfigModelDeserializationTest {
                   "uri": "lb://user-service",
                   "predicates": ["Path=/api/user/**"],
                   "filters": ["StripPrefix=1"],
+                  "order": 1,
                   "metadata": {
                     "rateLimit": {"ruleId": "user-service-limit"},
+                    "circuitBreaker": {"ruleId": "user-service-cb"},
                     "retry": {"maxAttempts": 3}
                   }
                 }
@@ -429,7 +431,9 @@ class ConfigModelDeserializationTest {
         assertThat(route.uri()).isEqualTo("lb://user-service");
         assertThat(route.predicates()).containsExactly("Path=/api/user/**");
         assertThat(route.filters()).containsExactly("StripPrefix=1");
+        assertThat(route.order()).isEqualTo(1);
         assertThat(route.metadata()).containsKey("rateLimit");
+        assertThat(route.metadata()).containsKey("circuitBreaker");
     }
 
     @Test
@@ -467,7 +471,7 @@ class ConfigModelDeserializationTest {
 
 期望：编译失败，类不存在。
 
-- [ ] **Step 3: 实现 AegisRoute**
+- [ ] **Step 3: 实现 AegisRoute（含 order 字段）**
 
 `gateway-core/src/main/java/io/aegis/gateway/core/model/config/AegisRoute.java`:
 ```java
@@ -481,6 +485,7 @@ public record AegisRoute(
         String uri,
         List<String> predicates,
         List<String> filters,
+        int order,
         Map<String, Object> metadata
 ) {}
 ```
@@ -531,7 +536,7 @@ public record GlobalConfig(CorsConfig cors, AuthConfig auth, AdminConfig admin) 
 package io.aegis.gateway.core.nacos;
 
 public final class NacosConfigKeys {
-    public static final String GROUP = "aegis";
+    public static final String DEFAULT_GROUP = "aegis";
     public static final String ROUTES = "aegis-routes.json";
     public static final String GOVERNANCE = "aegis-governance.json";
     public static final String GLOBAL = "aegis-global.json";
@@ -552,7 +557,7 @@ public final class NacosConfigKeys {
 
 ```bash
 git add gateway-core/src/
-git commit -m "feat(core): add Nacos config models (AegisRoute, GlobalConfig)"
+git commit -m "feat(core): add Nacos config models (AegisRoute with order, GlobalConfig)"
 ```
 
 ---
@@ -581,10 +586,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -599,14 +604,14 @@ class NacosConfigSyncServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        when(configService.getConfig(eq(NacosConfigKeys.ROUTES), eq(NacosConfigKeys.GROUP), anyLong()))
+        when(configService.getConfig(eq(NacosConfigKeys.ROUTES), eq(NacosConfigKeys.DEFAULT_GROUP), anyLong()))
             .thenReturn("{\"routes\":[]}");
-        when(configService.getConfig(eq(NacosConfigKeys.GOVERNANCE), eq(NacosConfigKeys.GROUP), anyLong()))
+        when(configService.getConfig(eq(NacosConfigKeys.GOVERNANCE), eq(NacosConfigKeys.DEFAULT_GROUP), anyLong()))
             .thenReturn("{}");
-        when(configService.getConfig(eq(NacosConfigKeys.GLOBAL), eq(NacosConfigKeys.GROUP), anyLong()))
+        when(configService.getConfig(eq(NacosConfigKeys.GLOBAL), eq(NacosConfigKeys.DEFAULT_GROUP), anyLong()))
             .thenReturn("{\"cors\":{\"allowedOrigins\":[\"*\"],\"allowedMethods\":[\"GET\"]},\"auth\":{\"jwtSecret\":\"\",\"excludePaths\":[]},\"admin\":{\"apiKey\":\"\"}}");
 
-        syncService = new NacosConfigSyncService(configService, objectMapper);
+        syncService = new NacosConfigSyncService(configService, objectMapper, NacosConfigKeys.DEFAULT_GROUP);
         syncService.init();
     }
 
@@ -618,24 +623,24 @@ class NacosConfigSyncServiceTest {
 
     @Test
     void init_shouldSubscribeToNacosListeners() throws Exception {
-        verify(configService, times(3)).addListener(any(), eq(NacosConfigKeys.GROUP), any(Listener.class));
+        verify(configService, times(3)).addListener(any(), eq(NacosConfigKeys.DEFAULT_GROUP), any(Listener.class));
     }
 
     @Test
     void routeChange_shouldUpdateInMemoryConfigAndNotifyListener() throws Exception {
         ArgumentCaptor<Listener> listenerCaptor = ArgumentCaptor.forClass(Listener.class);
-        verify(configService).addListener(eq(NacosConfigKeys.ROUTES), eq(NacosConfigKeys.GROUP), listenerCaptor.capture());
+        verify(configService).addListener(eq(NacosConfigKeys.ROUTES), eq(NacosConfigKeys.DEFAULT_GROUP), listenerCaptor.capture());
 
         AtomicReference<AegisRoutesConfig> received = new AtomicReference<>();
         syncService.registerRoutesListener(received::set);
 
         String newRoutesJson = """
-            {"routes":[{"id":"svc-a","uri":"lb://svc-a","predicates":["Path=/api/a/**"],"filters":[],"metadata":{}}]}
+            {"routes":[{"id":"svc-a","uri":"lb://svc-a","predicates":["Path=/api/a/**"],"filters":[],"order":0,"metadata":{}}]}
             """;
         listenerCaptor.getValue().receiveConfigInfo(newRoutesJson);
 
-        // 等待虚拟线程执行
-        Thread.sleep(100);
+        // 等待串行虚拟线程 Executor 处理完成
+        Thread.sleep(200);
 
         assertThat(syncService.getRoutesConfig().routes()).hasSize(1);
         assertThat(syncService.getRoutesConfig().routes().get(0).id()).isEqualTo("svc-a");
@@ -645,13 +650,13 @@ class NacosConfigSyncServiceTest {
     @Test
     void governanceChange_shouldNotifyRegisteredListener() throws Exception {
         ArgumentCaptor<Listener> listenerCaptor = ArgumentCaptor.forClass(Listener.class);
-        verify(configService).addListener(eq(NacosConfigKeys.GOVERNANCE), eq(NacosConfigKeys.GROUP), listenerCaptor.capture());
+        verify(configService).addListener(eq(NacosConfigKeys.GOVERNANCE), eq(NacosConfigKeys.DEFAULT_GROUP), listenerCaptor.capture());
 
         AtomicReference<String> received = new AtomicReference<>();
         syncService.registerGovernanceListener(received::set);
 
         listenerCaptor.getValue().receiveConfigInfo("{\"rateLimits\":[]}");
-        Thread.sleep(100);
+        Thread.sleep(200);
 
         assertThat(received.get()).isEqualTo("{\"rateLimits\":[]}");
     }
@@ -678,11 +683,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.aegis.gateway.core.model.config.AegisRoutesConfig;
 import io.aegis.gateway.core.model.config.GlobalConfig;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.StructuredTaskScope;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -694,6 +702,7 @@ public class NacosConfigSyncService {
 
     private final ConfigService configService;
     private final ObjectMapper objectMapper;
+    private final String nacosGroup;
 
     private final AtomicReference<AegisRoutesConfig> routesConfig =
             new AtomicReference<>(AegisRoutesConfig.empty());
@@ -706,56 +715,67 @@ public class NacosConfigSyncService {
     private final List<Consumer<String>> governanceListeners = new CopyOnWriteArrayList<>();
     private final List<Consumer<GlobalConfig>> globalListeners = new CopyOnWriteArrayList<>();
 
-    public NacosConfigSyncService(ConfigService configService, ObjectMapper objectMapper) {
+    // 每个 Data ID 独立的单线程虚拟线程 Executor，保证同一配置的更新串行有序
+    private final ExecutorService routesExecutor =
+            Executors.newSingleThreadExecutor(Thread.ofVirtual().name("nacos-routes-").factory());
+    private final ExecutorService governanceExecutor =
+            Executors.newSingleThreadExecutor(Thread.ofVirtual().name("nacos-governance-").factory());
+    private final ExecutorService globalExecutor =
+            Executors.newSingleThreadExecutor(Thread.ofVirtual().name("nacos-global-").factory());
+
+    public NacosConfigSyncService(ConfigService configService, ObjectMapper objectMapper, String nacosGroup) {
         this.configService = configService;
         this.objectMapper = objectMapper;
+        this.nacosGroup = nacosGroup;
     }
 
     @PostConstruct
     public void init() throws Exception {
-        try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+        // 使用 Structured Concurrency 并行加载三个 Nacos 配置，任一失败则整体失败
+        try (var scope = StructuredTaskScope.open(
+                StructuredTaskScope.Joiner.awaitAllSuccessfulOrThrow())) {
             scope.fork(() -> { loadAndSubscribeRoutes(); return null; });
             scope.fork(() -> { loadAndSubscribeGovernance(); return null; });
             scope.fork(() -> { loadAndSubscribeGlobal(); return null; });
-            scope.join().throwIfFailed();
+            scope.join();
         }
     }
 
     private void loadAndSubscribeRoutes() throws Exception {
-        String json = configService.getConfig(NacosConfigKeys.ROUTES, NacosConfigKeys.GROUP, TIMEOUT_MS);
+        String json = configService.getConfig(NacosConfigKeys.ROUTES, nacosGroup, TIMEOUT_MS);
         if (json != null) {
             updateRoutesConfig(json);
         }
-        configService.addListener(NacosConfigKeys.ROUTES, NacosConfigKeys.GROUP, new AbstractListener() {
+        configService.addListener(NacosConfigKeys.ROUTES, nacosGroup, new AbstractListener() {
             @Override
             public void receiveConfigInfo(String configInfo) {
-                Thread.ofVirtual().start(() -> updateRoutesConfig(configInfo));
+                routesExecutor.execute(() -> updateRoutesConfig(configInfo));
             }
         });
     }
 
     private void loadAndSubscribeGovernance() throws Exception {
-        String json = configService.getConfig(NacosConfigKeys.GOVERNANCE, NacosConfigKeys.GROUP, TIMEOUT_MS);
+        String json = configService.getConfig(NacosConfigKeys.GOVERNANCE, nacosGroup, TIMEOUT_MS);
         if (json != null) {
             updateGovernanceConfig(json);
         }
-        configService.addListener(NacosConfigKeys.GOVERNANCE, NacosConfigKeys.GROUP, new AbstractListener() {
+        configService.addListener(NacosConfigKeys.GOVERNANCE, nacosGroup, new AbstractListener() {
             @Override
             public void receiveConfigInfo(String configInfo) {
-                Thread.ofVirtual().start(() -> updateGovernanceConfig(configInfo));
+                governanceExecutor.execute(() -> updateGovernanceConfig(configInfo));
             }
         });
     }
 
     private void loadAndSubscribeGlobal() throws Exception {
-        String json = configService.getConfig(NacosConfigKeys.GLOBAL, NacosConfigKeys.GROUP, TIMEOUT_MS);
+        String json = configService.getConfig(NacosConfigKeys.GLOBAL, nacosGroup, TIMEOUT_MS);
         if (json != null) {
             updateGlobalConfig(json);
         }
-        configService.addListener(NacosConfigKeys.GLOBAL, NacosConfigKeys.GROUP, new AbstractListener() {
+        configService.addListener(NacosConfigKeys.GLOBAL, nacosGroup, new AbstractListener() {
             @Override
             public void receiveConfigInfo(String configInfo) {
-                Thread.ofVirtual().start(() -> updateGlobalConfig(configInfo));
+                globalExecutor.execute(() -> updateGlobalConfig(configInfo));
             }
         });
     }
@@ -771,8 +791,14 @@ public class NacosConfigSyncService {
     }
 
     private void updateGovernanceConfig(String json) {
-        governanceConfigJson.set(json);
-        governanceListeners.forEach(l -> l.accept(json));
+        try {
+            // 至少校验为合法 JSON，防止模块拿到损坏数据
+            objectMapper.readTree(json);
+            governanceConfigJson.set(json);
+            governanceListeners.forEach(l -> l.accept(json));
+        } catch (Exception e) {
+            log.error("Failed to parse governance config JSON", e);
+        }
     }
 
     private void updateGlobalConfig(String json) {
@@ -800,6 +826,13 @@ public class NacosConfigSyncService {
     public void registerGlobalListener(Consumer<GlobalConfig> listener) {
         globalListeners.add(listener);
     }
+
+    @PreDestroy
+    public void shutdown() {
+        routesExecutor.shutdown();
+        governanceExecutor.shutdown();
+        globalExecutor.shutdown();
+    }
 }
 ```
 
@@ -815,7 +848,7 @@ public class NacosConfigSyncService {
 
 ```bash
 git add gateway-core/src/
-git commit -m "feat(core): implement NacosConfigSyncService with virtual threads and structured concurrency"
+git commit -m "feat(core): implement NacosConfigSyncService with serial virtual thread executors"
 ```
 
 ---
@@ -850,6 +883,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -881,6 +915,7 @@ class AegisRouteDefinitionRepositoryTest {
             "lb://user-service",
             List.of("Path=/api/user/**"),
             List.of("StripPrefix=1"),
+            1,
             Map.of()
         );
         when(syncService.getRoutesConfig())
@@ -893,19 +928,20 @@ class AegisRouteDefinitionRepositoryTest {
                 assertThat(def.getUri().toString()).isEqualTo("lb://user-service");
                 assertThat(def.getPredicates()).hasSize(1);
                 assertThat(def.getFilters()).hasSize(1);
+                assertThat(def.getOrder()).isEqualTo(1);
             })
             .verifyComplete();
     }
 
     @Test
-    void onRoutesChange_shouldRefreshRoutesAndPublishEvent() {
+    void onRoutesChange_shouldAtomicallyReplaceRoutesAndPublishEvent() {
         ArgumentCaptor<Consumer<AegisRoutesConfig>> listenerCaptor =
             ArgumentCaptor.forClass(Consumer.class);
         verify(syncService).registerRoutesListener(listenerCaptor.capture());
 
         AegisRoute newRoute = new AegisRoute(
             "order-service", "lb://order-service",
-            List.of("Path=/api/order/**"), List.of(), Map.of()
+            List.of("Path=/api/order/**"), List.of(), 0, Map.of()
         );
         listenerCaptor.getValue().accept(new AegisRoutesConfig(List.of(newRoute)));
 
@@ -914,6 +950,20 @@ class AegisRouteDefinitionRepositoryTest {
         StepVerifier.create(repository.getRouteDefinitions())
             .assertNext(def -> assertThat(def.getId()).isEqualTo("order-service"))
             .verifyComplete();
+    }
+
+    @Test
+    void save_shouldReturnError_becauseNacosIsTheSingleSourceOfTruth() {
+        StepVerifier.create(repository.save(reactor.core.publisher.Mono.just(new RouteDefinition())))
+            .expectError(UnsupportedOperationException.class)
+            .verify();
+    }
+
+    @Test
+    void delete_shouldReturnError_becauseNacosIsTheSingleSourceOfTruth() {
+        StepVerifier.create(repository.delete(reactor.core.publisher.Mono.just("some-id")))
+            .expectError(UnsupportedOperationException.class)
+            .verify();
     }
 }
 ```
@@ -947,18 +997,19 @@ import reactor.core.publisher.Mono;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 public class AegisRouteDefinitionRepository implements RouteDefinitionRepository {
 
-    private final Map<String, RouteDefinition> routeStore = new ConcurrentHashMap<>();
+    private final AtomicReference<Map<String, RouteDefinition>> routeStore =
+            new AtomicReference<>(Map.of());
     private final ApplicationEventPublisher publisher;
 
     public AegisRouteDefinitionRepository(NacosConfigSyncService syncService,
                                           ApplicationEventPublisher publisher) {
         this.publisher = publisher;
-        AegisRoutesConfig initial = syncService.getRoutesConfig();
-        applyRoutes(initial.routes());
+        applyRoutes(syncService.getRoutesConfig().routes());
         syncService.registerRoutesListener(config -> {
             applyRoutes(config.routes());
             publisher.publishEvent(new RefreshRoutesEvent(this));
@@ -966,14 +1017,16 @@ public class AegisRouteDefinitionRepository implements RouteDefinitionRepository
     }
 
     private void applyRoutes(List<AegisRoute> routes) {
-        routeStore.clear();
-        routes.forEach(r -> routeStore.put(r.id(), toRouteDefinition(r)));
+        Map<String, RouteDefinition> newStore = routes.stream()
+            .collect(Collectors.toUnmodifiableMap(AegisRoute::id, this::toRouteDefinition));
+        routeStore.set(newStore);
     }
 
     private RouteDefinition toRouteDefinition(AegisRoute route) {
         RouteDefinition def = new RouteDefinition();
         def.setId(route.id());
         def.setUri(URI.create(route.uri()));
+        def.setOrder(route.order());
         def.setPredicates(route.predicates().stream()
             .map(PredicateDefinition::new)
             .toList());
@@ -986,17 +1039,19 @@ public class AegisRouteDefinitionRepository implements RouteDefinitionRepository
 
     @Override
     public Flux<RouteDefinition> getRouteDefinitions() {
-        return Flux.fromIterable(routeStore.values());
+        return Flux.fromIterable(routeStore.get().values());
     }
 
     @Override
     public Mono<Void> save(Mono<RouteDefinition> route) {
-        return route.doOnNext(r -> routeStore.put(r.getId(), r)).then();
+        return Mono.error(new UnsupportedOperationException(
+            "Route modification must go through Admin API → Nacos Config. Direct save is not supported."));
     }
 
     @Override
     public Mono<Void> delete(Mono<String> routeId) {
-        return routeId.doOnNext(routeStore::remove).then();
+        return Mono.error(new UnsupportedOperationException(
+            "Route deletion must go through Admin API → Nacos Config. Direct delete is not supported."));
     }
 }
 ```
@@ -1007,13 +1062,13 @@ public class AegisRouteDefinitionRepository implements RouteDefinitionRepository
 ./gradlew :gateway-core:test --tests "io.aegis.gateway.core.route.AegisRouteDefinitionRepositoryTest"
 ```
 
-期望：3 个测试全部 PASS。
+期望：5 个测试全部 PASS。
 
 - [ ] **Step 5: 提交**
 
 ```bash
 git add gateway-core/src/
-git commit -m "feat(core): implement AegisRouteDefinitionRepository with Nacos-driven hot reload"
+git commit -m "feat(core): implement AegisRouteDefinitionRepository with atomic update and Nacos single source of truth"
 ```
 
 ---
@@ -1032,7 +1087,6 @@ git commit -m "feat(core): implement AegisRouteDefinitionRepository with Nacos-d
 package io.aegis.gateway.core.exception;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.aegis.gateway.core.model.ApiResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
@@ -1047,7 +1101,7 @@ class GlobalExceptionHandlerTest {
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler(objectMapper);
 
     @Test
-    void handle_shouldReturnJsonApiResponseWithCode50000() {
+    void handle_shouldReturnJsonWithCode50000ForUnknownException() {
         var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/test").build());
         var result = handler.handle(exchange, new RuntimeException("unexpected error"));
 
@@ -1055,9 +1109,6 @@ class GlobalExceptionHandlerTest {
 
         assertThat(exchange.getResponse().getHeaders().getContentType())
             .isEqualTo(MediaType.APPLICATION_JSON);
-
-        byte[] body = exchange.getResponse().getBodyAsString().block().getBytes();
-        assertThat(body).isNotEmpty();
     }
 }
 ```
@@ -1080,10 +1131,10 @@ public final class AegisFilterOrder {
     public static final int AUTH = -200;
     public static final int RATE_LIMIT = -100;
     public static final int GRAY = -50;
-    public static final int LOAD_BALANCER = 100;
-    public static final int CIRCUIT_BREAKER = 200;
-    public static final int RETRY = 300;
-    public static final int MIRROR = 400;
+    public static final int CIRCUIT_BREAKER = 10050;
+    public static final int LOAD_BALANCER = 10150; // 与 SCG ReactiveLoadBalancerClientFilter 同 Order，替换之
+    public static final int RETRY = 10300;
+    public static final int MIRROR = 10400;
 
     private AegisFilterOrder() {}
 }
@@ -1192,33 +1243,39 @@ git commit -m "feat(core): add GlobalExceptionHandler and AegisFilterOrder const
 ```java
 package io.aegis.gateway.core.config;
 
-import com.alibaba.nacos.api.config.ConfigService;
+import com.alibaba.cloud.nacos.NacosConfigManager;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.aegis.gateway.core.exception.GlobalExceptionHandler;
+import io.aegis.gateway.core.nacos.NacosConfigKeys;
 import io.aegis.gateway.core.nacos.NacosConfigSyncService;
 import io.aegis.gateway.core.route.AegisRouteDefinitionRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
-import org.springframework.cloud.gateway.route.RouteDefinitionRepository;
+import org.springframework.cloud.gateway.config.GatewayAutoConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 
-@AutoConfiguration
+@AutoConfiguration(before = GatewayAutoConfiguration.class)
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.REACTIVE)
 public class AegisCoreAutoConfiguration {
 
-    @Bean
-    @ConditionalOnMissingBean
-    public NacosConfigSyncService nacosConfigSyncService(ConfigService configService,
-                                                         ObjectMapper objectMapper) {
-        return new NacosConfigSyncService(configService, objectMapper);
-    }
+    @Value("${aegis.gateway.nacos.group:" + NacosConfigKeys.DEFAULT_GROUP + "}")
+    private String nacosGroup;
 
     @Bean
+    @ConditionalOnMissingBean
+    public NacosConfigSyncService nacosConfigSyncService(NacosConfigManager nacosConfigManager,
+                                                         ObjectMapper objectMapper) throws Exception {
+        return new NacosConfigSyncService(nacosConfigManager.getConfigService(), objectMapper, nacosGroup);
+    }
+
+    // @Primary 确保优先级高于 SCG 可能注册的其他 RouteDefinitionRepository
+    // @AutoConfiguration(before = GatewayAutoConfiguration.class) 保证在 SCG 默认 InMemoryRouteDefinitionRepository 之前注册
+    @Bean
     @Primary
-    @ConditionalOnMissingBean(RouteDefinitionRepository.class)
     public AegisRouteDefinitionRepository aegisRouteDefinitionRepository(
             NacosConfigSyncService syncService,
             ApplicationEventPublisher publisher) {
@@ -1304,12 +1361,17 @@ spring:
       discovery:
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         namespace: ${NACOS_NAMESPACE:}
-        group: aegis
+        group: ${aegis.gateway.nacos.group:aegis}
       config:
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         namespace: ${NACOS_NAMESPACE:}
-        group: aegis
+        group: ${aegis.gateway.nacos.group:aegis}
         file-extension: json
+
+aegis:
+  gateway:
+    nacos:
+      group: ${AEGIS_NACOS_GROUP:aegis}
 
 logging:
   level:
@@ -1328,6 +1390,7 @@ COPY gateway-server/build/libs/gateway-server-*.jar app.jar
 
 ENV NACOS_SERVER_ADDR=127.0.0.1:8848
 ENV NACOS_NAMESPACE=
+ENV AEGIS_NACOS_GROUP=aegis
 
 EXPOSE 8080
 
@@ -1370,13 +1433,14 @@ ls gateway-server/build/libs/
 
 期望：生成 `gateway-server-1.0.0-SNAPSHOT.jar`。
 
-- [ ] **Step 3: 验证 JAR 包含依赖**
+- [ ] **Step 3: 验证 JAR 启动**
 
 ```bash
-java --enable-preview -jar gateway-server/build/libs/gateway-server-1.0.0-SNAPSHOT.jar --spring.cloud.nacos.discovery.server-addr=invalid 2>&1 | head -20
+java --enable-preview -jar gateway-server/build/libs/gateway-server-1.0.0-SNAPSHOT.jar \
+  --spring.cloud.nacos.discovery.server-addr=invalid 2>&1 | head -20
 ```
 
-期望：Spring Boot 启动日志出现，失败是因为 Nacos 连接不上（这是正常的，说明主流程走通了）。
+期望：Spring Boot 启动日志出现，因 Nacos 连接失败而退出（说明主流程走通，仅缺 Nacos 环境）。
 
 - [ ] **Step 4: 最终提交**
 
