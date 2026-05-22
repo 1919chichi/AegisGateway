@@ -14,6 +14,10 @@ AegisGateway 是一个基于 Spring Cloud Gateway 的高性能微服务治理网
 - 为现有 SCG 用户提供无感迁移路径，复用现有路由配置
 - 以 Nacos 为唯一外部依赖，降低部署复杂度
 
+**外部依赖：**
+- Nacos：服务注册 + 配置中心
+- Redis：通过 Redisson 接入，仅用于分布式限流
+
 **不做：**
 - 可观测性（Prometheus / OpenTelemetry）—— 列入后续版本
 - Body 级别请求/响应变换 —— 列入后续版本
@@ -173,8 +177,9 @@ AegisGateway/
 
 ### 7.1 限流（gateway-ratelimit）
 - 支持维度：路径级、服务级、用户级
-- 算法：令牌桶（本地）、滑动窗口（分布式）
-- 分布式限流通过 Nacos 配置同步规则，本地令牌桶在内存中维护
+- 算法：Redisson `RRateLimiter`（令牌桶），天然支持分布式，多实例共享同一限流状态
+- 每条限流规则对应一个 Redisson RRateLimiter 实例，key 由维度（路径/服务/用户）拼接
+- 规则配置（capacity、refillRate）从 Nacos 热更新，变更时重建对应的 RRateLimiter
 
 ### 7.2 熔断（gateway-circuitbreaker）
 - 基于 Resilience4j CircuitBreaker
@@ -252,5 +257,6 @@ AegisGateway/
 | 路由引擎 | Spring Cloud Gateway |
 | 服务注册/配置 | Nacos |
 | 熔断 | Resilience4j |
+| 限流 | Redisson RRateLimiter（令牌桶） |
 | 并发模型 | 虚拟线程 + Structured Concurrency |
 | 打包 | Docker + 可执行 JAR |
