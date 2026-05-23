@@ -5,9 +5,9 @@ import io.aegis.gateway.loadbalancer.discovery.NamespaceAwareNacosServiceInstanc
 import io.aegis.gateway.loadbalancer.discovery.NacosNamingServiceRegistry;
 import org.springframework.cloud.loadbalancer.core.ServiceInstanceListSupplier;
 import org.springframework.cloud.loadbalancer.support.LoadBalancerClientFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 import org.springframework.util.Assert;
 
@@ -15,7 +15,7 @@ import org.springframework.util.Assert;
 public class AegisNamespaceLoadBalancerClientConfiguration {
 
     @Bean
-    @Primary
+    @ConditionalOnMissingBean(ServiceInstanceListSupplier.class)
     public ServiceInstanceListSupplier aegisServiceInstanceListSupplier(Environment environment,
                                                                        NacosDiscoveryProperties discoveryProperties,
                                                                        NacosNamingServiceRegistry namingServiceRegistry) {
