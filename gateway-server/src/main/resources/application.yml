@@ -1,0 +1,26 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: aegis-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${aegis.gateway.nacos.group:aegis}
+      config:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: ${aegis.gateway.nacos.group:aegis}
+        file-extension: json
+
+aegis:
+  gateway:
+    nacos:
+      group: ${AEGIS_NACOS_GROUP:aegis}
+
+logging:
+  level:
+    io.aegis.gateway: DEBUG
