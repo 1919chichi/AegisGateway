@@ -126,6 +126,51 @@ docker run -p 8080:8080 \
 }
 ```
 
+### 多 namespace 权重路由示例
+
+同一个服务名可以拆成多条虚拟路由，通过 SCG `Weight` 控制 namespace 级流量比例。下面配置会把 `/api/users/**` 的流量按 80:20 分到 `dev` 和 `gray` namespace，两个 namespace 内仍调用同一个 `lb://user-service`。
+
+```json
+{
+  "routes": [
+    {
+      "id": "user-service-dev",
+      "uri": "lb://user-service",
+      "predicates": [
+        "Path=/api/users/**",
+        "Weight=user-service,80"
+      ],
+      "filters": ["StripPrefix=1"],
+      "order": 0,
+      "metadata": {
+        "discovery": {
+          "namespace": "dev",
+          "group": "DEFAULT_GROUP"
+        }
+      }
+    },
+    {
+      "id": "user-service-gray",
+      "uri": "lb://user-service",
+      "predicates": [
+        "Path=/api/users/**",
+        "Weight=user-service,20"
+      ],
+      "filters": ["StripPrefix=1"],
+      "order": 0,
+      "metadata": {
+        "discovery": {
+          "namespace": "gray",
+          "group": "DEFAULT_GROUP"
+        }
+      }
+    }
+  ]
+}
+```
+
+`Weight` 只控制虚拟路由命中比例；命中某条虚拟路由后，`gateway-loadbalancer` 只读取该路由 `metadata.discovery.namespace` 指定 namespace 下的健康实例。
+
 ### 全局配置示例（`aegis-global.json`）
 
 ```json
