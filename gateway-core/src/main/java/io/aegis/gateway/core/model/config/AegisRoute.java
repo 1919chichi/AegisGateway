@@ -10,4 +10,10 @@ public record AegisRoute(
         List<String> filters,
         int order,
         Map<String, Object> metadata
-) {}
+) {
+    public AegisRoute {
+        predicates = predicates == null ? List.of() : List.copyOf(predicates);
+        filters    = filters    == null ? List.of() : List.copyOf(filters);
+        metadata   = metadata   == null ? Map.of()  : Map.copyOf(metadata);
+    }
+}
