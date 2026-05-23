@@ -51,7 +51,7 @@ public class AegisRouteDefinitionRepository implements RouteDefinitionRepository
         def.setFilters(route.filters().stream()
             .map(FilterDefinition::new)
             .toList());
-        def.setMetadata(route.metadata() != null ? route.metadata() : Map.of());
+        def.setMetadata(route.metadata());
         return def;
     }
 
