@@ -15,6 +15,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.StructuredTaskScope;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -40,11 +41,11 @@ public class NacosConfigSyncService {
 
     // 每个 Data ID 独立的单线程虚拟线程 Executor，保证同一配置的更新串行有序
     private final ExecutorService routesExecutor =
-            Executors.newSingleThreadExecutor(Thread.ofVirtual().name("nacos-routes-").factory());
+            Executors.newSingleThreadExecutor(Thread.ofVirtual().name("nacos-routes-", 0).factory());
     private final ExecutorService governanceExecutor =
-            Executors.newSingleThreadExecutor(Thread.ofVirtual().name("nacos-governance-").factory());
+            Executors.newSingleThreadExecutor(Thread.ofVirtual().name("nacos-governance-", 0).factory());
     private final ExecutorService globalExecutor =
-            Executors.newSingleThreadExecutor(Thread.ofVirtual().name("nacos-global-").factory());
+            Executors.newSingleThreadExecutor(Thread.ofVirtual().name("nacos-global-", 0).factory());
 
     public NacosConfigSyncService(ConfigService configService, ObjectMapper objectMapper, String nacosGroup) {
         this.configService = configService;
@@ -155,5 +156,12 @@ public class NacosConfigSyncService {
         routesExecutor.shutdown();
         governanceExecutor.shutdown();
         globalExecutor.shutdown();
+        try {
+            if (!routesExecutor.awaitTermination(2, TimeUnit.SECONDS))     routesExecutor.shutdownNow();
+            if (!governanceExecutor.awaitTermination(2, TimeUnit.SECONDS)) governanceExecutor.shutdownNow();
+            if (!globalExecutor.awaitTermination(2, TimeUnit.SECONDS))     globalExecutor.shutdownNow();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

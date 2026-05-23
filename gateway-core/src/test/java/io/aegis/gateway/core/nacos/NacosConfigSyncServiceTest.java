@@ -11,9 +11,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -66,11 +68,11 @@ class NacosConfigSyncServiceTest {
         listenerCaptor.getValue().receiveConfigInfo(newRoutesJson);
 
         // 等待串行虚拟线程 Executor 处理完成
-        Thread.sleep(200);
-
-        assertThat(syncService.getRoutesConfig().routes()).hasSize(1);
-        assertThat(syncService.getRoutesConfig().routes().get(0).id()).isEqualTo("svc-a");
-        assertThat(received.get().routes()).hasSize(1);
+        await().atMost(2, TimeUnit.SECONDS).untilAsserted(() -> {
+            assertThat(syncService.getRoutesConfig().routes()).hasSize(1);
+            assertThat(syncService.getRoutesConfig().routes().get(0).id()).isEqualTo("svc-a");
+            assertThat(received.get().routes()).hasSize(1);
+        });
     }
 
     @Test
@@ -82,8 +84,9 @@ class NacosConfigSyncServiceTest {
         syncService.registerGovernanceListener(received::set);
 
         listenerCaptor.getValue().receiveConfigInfo("{\"rateLimits\":[]}");
-        Thread.sleep(200);
 
-        assertThat(received.get()).isEqualTo("{\"rateLimits\":[]}");
+        await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+            assertThat(received.get()).isEqualTo("{\"rateLimits\":[]}")
+        );
     }
 }
