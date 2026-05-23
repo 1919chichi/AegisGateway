@@ -2,7 +2,6 @@ package io.aegis.gateway.core.nacos;
 
 import com.alibaba.nacos.api.config.ConfigService;
 import com.alibaba.nacos.api.config.listener.AbstractListener;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.aegis.gateway.core.model.config.AegisRoutesConfig;
 import io.aegis.gateway.core.model.config.GlobalConfig;
 import jakarta.annotation.PostConstruct;
@@ -18,6 +17,7 @@ import java.util.concurrent.StructuredTaskScope;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import tools.jackson.databind.ObjectMapper;
 
 public class NacosConfigSyncService {
 

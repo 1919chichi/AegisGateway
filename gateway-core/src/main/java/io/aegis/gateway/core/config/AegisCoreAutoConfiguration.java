@@ -1,7 +1,6 @@
 package io.aegis.gateway.core.config;
 
 import com.alibaba.cloud.nacos.NacosConfigManager;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.aegis.gateway.core.exception.GlobalExceptionHandler;
 import io.aegis.gateway.core.nacos.NacosConfigKeys;
 import io.aegis.gateway.core.nacos.NacosConfigSyncService;
@@ -13,7 +12,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.cloud.gateway.config.GatewayAutoConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
+import tools.jackson.databind.ObjectMapper;
 
 @AutoConfiguration(before = GatewayAutoConfiguration.class)
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.REACTIVE)
@@ -30,9 +29,7 @@ public class AegisCoreAutoConfiguration {
                 nacosConfigManager.getConfigService(), objectMapper, nacosGroup);
     }
 
-    // @Primary 确保优先级高于 SCG 可能注册的其他 RouteDefinitionRepository
     @Bean
-    @Primary
     @ConditionalOnMissingBean(AegisRouteDefinitionRepository.class)
     public AegisRouteDefinitionRepository aegisRouteDefinitionRepository(
             NacosConfigSyncService syncService,

@@ -1,0 +1,41 @@
+services:
+  nacos:
+    image: nacos/nacos-server:v3.1.1
+    container_name: aegis-nacos
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"
+      NACOS_AUTH_TOKEN: "YWVnaXMtZ2F0ZXdheS1sb2NhbC1kZXZlbG9wbWVudC10b2tlbi1tdXN0LWJlLTMyeC1jaGFycw=="
+      NACOS_AUTH_IDENTITY_KEY: "serverIdentity"
+      NACOS_AUTH_IDENTITY_VALUE: "aegis-local-dev"
+      PREFER_HOST_MODE: hostname
+    ports:
+      - "8848:8848"
+      - "18080:8080"
+      - "9848:9848"
+      - "9849:9849"
+    volumes:
+      - nacos-data:/home/nacos/data
+      - nacos-logs:/home/nacos/logs
+    networks:
+      - aegis-dev
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: aegis-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - aegis-dev
+
+networks:
+  aegis-dev:
+    name: aegis-dev
+
+volumes:
+  nacos-data:
+  nacos-logs:
+  redis-data:
