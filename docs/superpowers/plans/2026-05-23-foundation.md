@@ -6,7 +6,7 @@
 
 **Architecture:** Spring Cloud Gateway 提供响应式路由引擎。gateway-core 是纯库模块，所有治理模块只依赖它。它拥有：通过虚拟线程监听 Nacos 配置、维护内存配置状态、标准 ApiResponse 封装、实现 SCG 的 RouteDefinitionRepository。治理模块通过 NacosConfigSyncService 注册各自的配置变更监听器，自行解析本模块配置。每个 Data ID 使用独立的单线程虚拟线程 Executor，保证同一 Data ID 配置更新串行有序。
 
-**Tech Stack:** JDK 25, Gradle 9.1.0, Spring Boot 3.4.1, Spring Cloud Gateway 4.2.x, Spring Cloud Alibaba 2023.0.3.2 (Nacos), Jackson, JUnit 5, Mockito 5, Reactor Test
+**Tech Stack:** JDK 25, Gradle 9.1.0, Spring Boot 4.0.6, Spring Cloud 2025.1.1, Spring Cloud Gateway 5.0.1, Spring Cloud Alibaba 2025.1.0.0 (Nacos 3.1.1), Jackson, JUnit 5, Mockito 5, Reactor Test
 
 ---
 
@@ -93,7 +93,7 @@ include 'gateway-server'
 ```groovy
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.4.1' apply false
+    id 'org.springframework.boot' version '4.0.6' apply false
     id 'io.spring.dependency-management' version '1.1.7' apply false
 }
 
@@ -116,9 +116,9 @@ subprojects {
 
     dependencyManagement {
         imports {
-            mavenBom "org.springframework.boot:spring-boot-dependencies:3.4.1"
-            mavenBom "org.springframework.cloud:spring-cloud-dependencies:2024.0.0"
-            mavenBom "com.alibaba.cloud:spring-cloud-alibaba-dependencies:2023.0.3.2"
+            mavenBom "org.springframework.boot:spring-boot-dependencies:4.0.6"
+            mavenBom "org.springframework.cloud:spring-cloud-dependencies:2025.1.1"
+            mavenBom "com.alibaba.cloud:spring-cloud-alibaba-dependencies:2025.1.0.0"
         }
     }
 
@@ -148,7 +148,7 @@ subprojects {
 
 ```groovy
 dependencies {
-    implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
+    implementation 'org.springframework.cloud:spring-cloud-starter-gateway-server-webflux'
     implementation 'com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery'
     implementation 'com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-config'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
@@ -163,7 +163,7 @@ dependencies {
 ```groovy
 dependencies {
     implementation project(':gateway-core')
-    implementation 'org.redisson:redisson-spring-boot-starter:3.37.0'
+    implementation 'org.redisson:redisson-spring-boot-starter:4.4.0'
 }
 ```
 
@@ -1132,7 +1132,7 @@ public final class AegisFilterOrder {
     public static final int RATE_LIMIT = -100;
     public static final int GRAY = -50;
     public static final int CIRCUIT_BREAKER = 10050;
-    public static final int LOAD_BALANCER = 10150; // 与 SCG ReactiveLoadBalancerClientFilter 同 Order，替换之
+    // SCG ReactiveLoadBalancerClientFilter 使用 10150；Aegis 通过 Spring Cloud LoadBalancer 扩展实例选择，不定义自有 LB GlobalFilter。
     public static final int RETRY = 10300;
     public static final int MIRROR = 10400;
 
@@ -1162,7 +1162,7 @@ import org.springframework.web.server.WebExceptionHandler;
 import reactor.core.publisher.Mono;
 
 @Component
-@Order(-1)
+@Order(-2)
 public class GlobalExceptionHandler implements WebExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);

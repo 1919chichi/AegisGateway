@@ -34,7 +34,7 @@ AegisGateway 是一个基于 Spring Cloud Gateway 的高性能微服务治理网
                     │       ↓ 匹配成功后进入 GlobalFilter 链           │
                     │  Auth → RateLimit → Gray(染色)                  │
                     │       ↓                                         │
-                    │  CircuitBreaker → LoadBalancer(Nacos感知) → Retry│
+                    │  CircuitBreaker → SCG LoadBalancer(Nacos) → Retry │
                     │       ↓                                         │
                     │  Mirror(async VirtualThread)                    │──▶ 上游服务
                     └─────────────────┬───────────────────────────────┘
@@ -47,8 +47,8 @@ AegisGateway 是一个基于 Spring Cloud Gateway 的高性能微服务治理网
 
 **架构原则：**
 - SCG HandlerMapping 完成路由匹配后，请求进入 GlobalFilter 链；所有 GlobalFilter 均在路由匹配完成后执行
-- Auth、RateLimit 在早期（负序 Order）拦截；LoadBalancer、CircuitBreaker 在靠近实际代理的位置（Order ≥10000）执行
-- GrayFilter 在 Filter 链中设置染色属性（exchange attribute），LoadBalancer 读取该属性进行实例选择，不改变已匹配的路由
+- Auth、RateLimit 在早期（负序 Order）拦截；CircuitBreaker、Retry 在靠近实际代理的位置（Order ≥10000）执行
+- GrayFilter 在 Filter 链中设置染色属性（exchange attribute），Spring Cloud LoadBalancer 扩展读取该属性进行实例选择，不改变已匹配路由，也不改写 `lb://` URI
 - Nacos Config 是唯一配置来源，变更通过 Listener 热推到内存，无需重启
 - 虚拟线程处理所有 I/O（Nacos 订阅、镜像请求）；每个 Data ID 使用独立串行虚拟线程执行器，保证配置更新有序
 
@@ -82,9 +82,9 @@ AegisGateway/
 |-------|--------|------|------|
 | -200 | AuthFilter | gateway-auth | 最先执行，未认证直接拒绝 |
 | -100 | RateLimitFilter | gateway-ratelimit | 认证通过后限流 |
-| -50 | GrayFilter | gateway-gray | 在 exchange 上设置灰度属性（X-Gray-Version 等），供 LoadBalancer 读取；不改变已匹配路由 |
+| -50 | GrayFilter | gateway-gray | 在 exchange 上设置灰度属性（X-Gray-Version 等），供 Spring Cloud LoadBalancer 扩展读取；不改变已匹配路由 |
 | 10050 | CircuitBreakerFilter | gateway-circuitbreaker | 包裹上游调用，熔断打开时快速失败 |
-| 10150 | AegisLoadBalancerFilter | gateway-loadbalancer | 替换 SCG 内置 ReactiveLoadBalancerClientFilter（同 Order），读取灰度属性，从 Nacos 健康实例中选择目标 |
+| 10150 | ReactiveLoadBalancerClientFilter | SCG 内置 + gateway-loadbalancer 扩展 | 处理 `lb://service` URI，调用 Spring Cloud LoadBalancer；实例列表来自 Nacos，选择策略由 gateway-loadbalancer 扩展 |
 | 10300 | RetryFilter | gateway-circuitbreaker | 失败重试，联动熔断状态；熔断打开时跳过重试 |
 | 10400 | MirrorFilter | gateway-mirror | 异步镜像，虚拟线程 fire-and-forget，不阻塞主链路 |
 
@@ -203,16 +203,17 @@ AegisGateway/
 - 路由通过 `metadata.circuitBreaker.ruleId` 引用 `aegis-governance.json` 中定义的熔断规则
 
 ### 7.3 负载均衡（gateway-loadbalancer）
-- 策略：加权轮询、最少连接、一致性哈希
-- 服务实例列表来自 Nacos，天然过滤不健康实例（Nacos 心跳托管健康检查）
-- 读取 GrayFilter 设置的 exchange 属性，将灰度流量路由到对应版本实例
-- 保留并迁移当前项目中获取 Nacos 不同 namespace 服务的能力（NacosServiceDiscoveryV2）
-- Order 设为 10150，替换 SCG 内置 `ReactiveLoadBalancerClientFilter`
+- 路由配置保持 `lb://service-name`，实际下游调用由 SCG 内置 `ReactiveLoadBalancerClientFilter`(Order=10150) 触发
+- 服务实例列表来自 Nacos Discovery，健康状态由 Nacos 心跳托管，并交给 Spring Cloud LoadBalancer 选择实例
+- `gateway-loadbalancer` 不实现自定义 `GlobalFilter`，不改写 `GATEWAY_REQUEST_URL_ATTR`，也不禁用 SCG 内置负载均衡
+- `gateway-loadbalancer` 通过 Spring Cloud LoadBalancer 扩展点实现策略：加权轮询、最少连接、一致性哈希
+- 读取 `GrayFilter` 写入的 exchange 属性或 LoadBalancer request context，将灰度流量筛选到匹配版本实例
+- 保留并迁移当前项目中获取 Nacos 不同 namespace 服务的能力（NacosServiceDiscoveryV2），作为自定义实例列表供应或服务发现适配层
 
 ### 7.4 灰度发布（gateway-gray）
 - 路由维度：请求 Header、用户标识、流量比例
 - GrayFilter 在 exchange 上设置染色属性（如 `AEGIS_GRAY_VERSION = "v2"`）
-- LoadBalancer 读取该属性，从 Nacos 实例中筛选匹配版本的实例
+- Spring Cloud LoadBalancer 扩展读取该属性，从 Nacos 实例中筛选匹配版本的实例
 - 配置在 `aegis-governance.json` 中热更新
 
 ### 7.5 认证鉴权（gateway-auth）
@@ -286,7 +287,7 @@ AegisGateway/
 | Nacos 多 namespace 服务发现 | v1 |
 | 限流（路径/服务/用户级，Redisson 令牌桶） | v1 |
 | 熔断（Resilience4j） | v1 |
-| 负载均衡（加权轮询/最少连接/一致性哈希） | v1 |
+| Spring Cloud LoadBalancer 扩展（加权轮询/最少连接/一致性哈希） | v1 |
 | 灰度发布 / 流量染色 | v1 |
 | JWT / OAuth2 / API Key 认证 | v1 |
 | Header 改写、路径重写、CORS | v1 |
@@ -305,10 +306,13 @@ AegisGateway/
 | 组件 | 选型 |
 |------|------|
 | JDK | 25 |
-| 构建工具 | Gradle 9.1+ |
-| 路由引擎 | Spring Cloud Gateway |
-| 服务注册/配置 | Nacos |
+| Spring Boot | 4.0.6 |
+| Spring Cloud | 2025.1.1 |
+| Spring Cloud Alibaba | 2025.1.0.0 |
+| 构建工具 | Gradle 9.1.0 |
+| 路由引擎 | Spring Cloud Gateway 5.0.1 |
+| 服务注册/配置 | Nacos 3.1.1 |
 | 熔断 | Resilience4j |
-| 限流 | Redisson RRateLimiter（令牌桶） |
+| 限流 | Redisson 4.4.0 RRateLimiter（令牌桶） |
 | 并发模型 | 虚拟线程 + Structured Concurrency |
 | 打包 | Docker + 可执行 JAR |
