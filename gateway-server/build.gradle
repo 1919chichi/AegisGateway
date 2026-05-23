@@ -2,6 +2,10 @@ plugins {
     id 'org.springframework.boot'
 }
 
+bootRun {
+    jvmArgs '--enable-preview', '--sun-misc-unsafe-memory-access=allow', '--enable-native-access=ALL-UNNAMED'
+}
+
 dependencies {
     implementation project(':gateway-core')
     implementation project(':gateway-ratelimit')
@@ -13,4 +17,5 @@ dependencies {
     implementation project(':gateway-mirror')
     implementation project(':gateway-admin')
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    runtimeOnly group: 'io.netty', name: 'netty-resolver-dns-native-macos', classifier: 'osx-aarch_64'
 }

@@ -2,6 +2,7 @@
 build/
 *.class
 *.log
-.idea/
+.idea/*
+!.idea/runConfigurations/
 *.iml
 .DS_Store

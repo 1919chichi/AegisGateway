@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="AegisGatewayApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="aegis-gateway.gateway-server.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="io.aegis.gateway.server.AegisGatewayApplication" />
+    <option name="VM_PARAMETERS" value="--enable-preview --sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED" />
+    <option name="WORKING_DIRECTORY" value="file://$MODULE_WORKING_DIR$" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

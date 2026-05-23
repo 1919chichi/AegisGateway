@@ -1,7 +1,5 @@
 package io.aegis.gateway.core.exception;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.aegis.gateway.core.filter.AegisFilterOrder;
 import io.aegis.gateway.core.model.AegisErrorCode;
 import io.aegis.gateway.core.model.ApiResponse;
@@ -14,6 +12,8 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebExceptionHandler;
 import reactor.core.publisher.Mono;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 @Order(AegisFilterOrder.EXCEPTION_HANDLER)
 public class GlobalExceptionHandler implements WebExceptionHandler {
@@ -37,7 +37,7 @@ public class GlobalExceptionHandler implements WebExceptionHandler {
         byte[] body;
         try {
             body = objectMapper.writeValueAsBytes(ApiResponse.error(errorCode));
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("Failed to serialize error response", e);
             body = ("{\"code\":50000,\"message\":\"Internal server error\",\"data\":null,\"timestamp\":"
                     + System.currentTimeMillis() + "}").getBytes(java.nio.charset.StandardCharsets.UTF_8);

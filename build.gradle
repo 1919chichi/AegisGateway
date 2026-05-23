@@ -36,7 +36,7 @@ subprojects {
 
     test {
         useJUnitPlatform()
-        jvmArgs '--enable-preview'
+        jvmArgs '--enable-preview', '--sun-misc-unsafe-memory-access=allow', '--enable-native-access=ALL-UNNAMED'
     }
 
     compileJava {
