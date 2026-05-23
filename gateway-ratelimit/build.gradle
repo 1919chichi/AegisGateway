@@ -1,0 +1,4 @@
+dependencies {
+    implementation project(':gateway-core')
+    implementation 'org.redisson:redisson-spring-boot-starter:4.4.0'
+}

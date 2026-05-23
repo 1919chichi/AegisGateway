@@ -1,0 +1,16 @@
+plugins {
+    id 'org.springframework.boot'
+}
+
+dependencies {
+    implementation project(':gateway-core')
+    implementation project(':gateway-ratelimit')
+    implementation project(':gateway-circuitbreaker')
+    implementation project(':gateway-loadbalancer')
+    implementation project(':gateway-gray')
+    implementation project(':gateway-auth')
+    implementation project(':gateway-transform')
+    implementation project(':gateway-mirror')
+    implementation project(':gateway-admin')
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+}

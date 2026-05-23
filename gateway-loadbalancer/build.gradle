@@ -1,0 +1,5 @@
+dependencies {
+    implementation project(':gateway-core')
+    implementation 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
+    implementation 'com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery'
+}

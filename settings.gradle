@@ -1,0 +1,12 @@
+rootProject.name = 'aegis-gateway'
+
+include 'gateway-core'
+include 'gateway-ratelimit'
+include 'gateway-circuitbreaker'
+include 'gateway-loadbalancer'
+include 'gateway-gray'
+include 'gateway-auth'
+include 'gateway-transform'
+include 'gateway-mirror'
+include 'gateway-admin'
+include 'gateway-server'
