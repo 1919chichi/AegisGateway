@@ -9,11 +9,11 @@ spring:
       discovery:
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         namespace: ${NACOS_NAMESPACE:}
-        group: ${aegis.gateway.nacos.group:aegis}
+        group: ${AEGIS_NACOS_GROUP:aegis}
       config:
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
         namespace: ${NACOS_NAMESPACE:}
-        group: ${aegis.gateway.nacos.group:aegis}
+        group: ${AEGIS_NACOS_GROUP:aegis}
         file-extension: json
 
 aegis:
