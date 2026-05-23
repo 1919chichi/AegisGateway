@@ -30,6 +30,9 @@ class ApiResponseTest {
         ApiResponse<Void> response = ApiResponse.error(AegisErrorCode.RATE_LIMIT_PATH);
 
         assertThat(response.code()).isEqualTo(42901);
+        assertThat(response.message()).isEqualTo("Rate limit exceeded (path)");
+        assertThat(response.data()).isNull();
+        assertThat(response.timestamp()).isPositive();
     }
 
     @Test
@@ -37,5 +40,18 @@ class ApiResponseTest {
         ApiResponse<Void> response = ApiResponse.error(AegisErrorCode.SERVICE_UNAVAILABLE);
 
         assertThat(response.code()).isEqualTo(50300);
+        assertThat(response.message()).isEqualTo("Service unavailable (circuit breaker open)");
+        assertThat(response.data()).isNull();
+        assertThat(response.timestamp()).isPositive();
+    }
+
+    @Test
+    void error_withCustomCodeAndMessage_shouldReturnCustomValues() {
+        ApiResponse<Void> response = ApiResponse.error(42000, "Custom error");
+
+        assertThat(response.code()).isEqualTo(42000);
+        assertThat(response.message()).isEqualTo("Custom error");
+        assertThat(response.data()).isNull();
+        assertThat(response.timestamp()).isPositive();
     }
 }
