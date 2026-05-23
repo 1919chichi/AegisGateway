@@ -12,7 +12,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.cloud.gateway.config.GatewayAutoConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.cloud.gateway.route.RouteDefinitionRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 
@@ -34,7 +33,7 @@ public class AegisCoreAutoConfiguration {
     // @Primary 确保优先级高于 SCG 可能注册的其他 RouteDefinitionRepository
     @Bean
     @Primary
-    @ConditionalOnMissingBean(RouteDefinitionRepository.class)
+    @ConditionalOnMissingBean(AegisRouteDefinitionRepository.class)
     public AegisRouteDefinitionRepository aegisRouteDefinitionRepository(
             NacosConfigSyncService syncService,
             ApplicationEventPublisher publisher) {
