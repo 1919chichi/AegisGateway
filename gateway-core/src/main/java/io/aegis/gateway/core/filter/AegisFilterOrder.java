@@ -1,6 +1,7 @@
 package io.aegis.gateway.core.filter;
 
 public final class AegisFilterOrder {
+    public static final int EXCEPTION_HANDLER = -2;
     public static final int AUTH = -200;
     public static final int RATE_LIMIT = -100;
     public static final int GRAY = -50;

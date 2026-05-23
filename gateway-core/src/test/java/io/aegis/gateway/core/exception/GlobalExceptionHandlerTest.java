@@ -24,4 +24,28 @@ class GlobalExceptionHandlerTest {
         assertThat(exchange.getResponse().getHeaders().getContentType())
             .isEqualTo(MediaType.APPLICATION_JSON);
     }
+
+    @Test
+    void handle_shouldReturn40401ForNotFoundResponseStatusException() throws Exception {
+        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/test").build());
+        var ex = new org.springframework.web.server.ResponseStatusException(
+            org.springframework.http.HttpStatus.NOT_FOUND, "not found");
+
+        StepVerifier.create(handler.handle(exchange, ex)).verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode())
+            .isEqualTo(org.springframework.http.HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void handle_shouldReturn42901ForTooManyRequestsException() throws Exception {
+        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/test").build());
+        var ex = new org.springframework.web.server.ResponseStatusException(
+            org.springframework.http.HttpStatus.TOO_MANY_REQUESTS, "rate limited");
+
+        StepVerifier.create(handler.handle(exchange, ex)).verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode())
+            .isEqualTo(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS);
+    }
 }
