@@ -83,8 +83,11 @@ public class NamespaceAwareNacosServiceInstanceListSupplier implements ServiceIn
     }
 
     private List<ServiceInstance> loadInstances(Request request) throws Exception {
-        Route route = extractRoute(request);
-        AegisDiscoveryMetadata metadata = AegisDiscoveryMetadata.from(route, discoveryProperties);
+        // 优先读取 GrayRoutingFilter 写入的 exchange attribute，再回退到路由 metadata / 全局默认值
+        AegisDiscoveryMetadata attrMetadata = extractGrayMetadata(request);
+        AegisDiscoveryMetadata metadata = attrMetadata != null
+                ? attrMetadata
+                : AegisDiscoveryMetadata.from(extractRoute(request), discoveryProperties);
         NamingService namingService = namingServiceRegistry.getNamingService(metadata);
         List<Instance> instances = namingService.selectInstances(serviceId, metadata.group(), true);
         List<ServiceInstance> serviceInstances = instances.stream()
@@ -92,12 +95,8 @@ public class NamespaceAwareNacosServiceInstanceListSupplier implements ServiceIn
                 .flatMap(List::stream)
                 .toList();
         if (log.isDebugEnabled()) {
-            log.debug("Loaded Nacos instances routeId={}, serviceId={}, namespace={}, group={}, count={}",
-                    route == null ? "" : route.getId(),
-                    serviceId,
-                    metadata.namespace(),
-                    metadata.group(),
-                    serviceInstances.size());
+            log.debug("Loaded Nacos instances serviceId={}, namespace={}, group={}, count={}",
+                    serviceId, metadata.namespace(), metadata.group(), serviceInstances.size());
         }
         return serviceInstances;
     }
@@ -112,6 +111,18 @@ public class NamespaceAwareNacosServiceInstanceListSupplier implements ServiceIn
         }
         Object route = requestData.getAttributes().get(GATEWAY_ROUTE_ATTR);
         return route instanceof Route selectedRoute ? selectedRoute : null;
+    }
+
+    private AegisDiscoveryMetadata extractGrayMetadata(Request request) {
+        if (request == null || !(request.getContext() instanceof RequestDataContext context)) {
+            return null;
+        }
+        RequestData requestData = context.getClientRequest();
+        if (requestData == null) {
+            return null;
+        }
+        Object attr = requestData.getAttributes().get(AegisDiscoveryMetadata.ATTR_KEY);
+        return attr instanceof AegisDiscoveryMetadata m ? m : null;
     }
 
     private List<ServiceInstance> toServiceInstance(Instance instance, AegisDiscoveryMetadata metadata) {
