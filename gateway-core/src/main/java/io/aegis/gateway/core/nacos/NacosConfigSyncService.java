@@ -19,6 +19,18 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * 负责从 Nacos 拉取并订阅三个核心配置文件（路由、治理、全局），是所有配置的单一入口。
+ * <p>
+ * 启动时使用 Java 25 Structured Concurrency 并行加载三个配置；任意一个超时或失败
+ * 会导致整体启动失败，防止网关以不完整配置上线。
+ * <p>
+ * 每个 Data ID 持有独立的单线程虚拟线程 Executor，保证同一配置的 Nacos 推送事件
+ * 按到达顺序串行处理，避免乱序覆盖。
+ * <p>
+ * 其他模块通过 {@link #registerRoutesListener}、{@link #registerGovernanceListener}、
+ * {@link #registerGlobalListener} 注册回调，即可在配置热更新时收到通知。
+ */
 public class NacosConfigSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(NacosConfigSyncService.class);

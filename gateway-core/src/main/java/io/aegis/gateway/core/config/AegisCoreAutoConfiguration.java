@@ -14,6 +14,12 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * gateway-core 模块的自动配置入口，注册 Nacos 配置同步、路由仓库、全局异常处理器三个核心 Bean。
+ * <p>
+ * 必须在 {@link GatewayAutoConfiguration} 之前执行，以确保 {@link AegisRouteDefinitionRepository}
+ * 先于 SCG 默认的 RouteDefinitionRepository 注册，成为实际使用的实现。
+ */
 @AutoConfiguration(before = GatewayAutoConfiguration.class)
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.REACTIVE)
 public class AegisCoreAutoConfiguration {

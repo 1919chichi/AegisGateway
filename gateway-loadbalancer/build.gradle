@@ -4,4 +4,5 @@ dependencies {
     testImplementation 'org.springframework.cloud:spring-cloud-starter-gateway-server-webflux'
     implementation 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
     implementation 'com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery'
+    implementation 'com.github.ben-manes.caffeine:caffeine'
 }

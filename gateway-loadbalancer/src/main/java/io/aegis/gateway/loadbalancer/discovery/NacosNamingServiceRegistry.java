@@ -13,6 +13,15 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+/**
+ * 按 Nacos 命名空间缓存并复用 {@link NamingService} 实例。
+ * <p>
+ * 创建 {@link NamingService} 的成本较高（建立长连接），因此首次请求某命名空间时
+ * 延迟创建并永久缓存，后续请求直接复用。应用关闭时统一释放所有连接。
+ * <p>
+ * 内部提供包级可见的构造器，用于在单元测试中注入 {@link NamingServiceFactory} mock，
+ * 避免测试依赖真实 Nacos。
+ */
 public class NacosNamingServiceRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(NacosNamingServiceRegistry.class);

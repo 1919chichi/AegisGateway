@@ -18,6 +18,15 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+/**
+ * 以 Nacos 为唯一数据源的 Spring Cloud Gateway RouteDefinitionRepository 实现。
+ * <p>
+ * 启动时从 {@link NacosConfigSyncService} 加载初始路由，并订阅后续变更；
+ * 每次收到新配置时原子替换内存路由 Map，再发布 {@link RefreshRoutesEvent} 触发 SCG 重载。
+ * <p>
+ * {@link #save} 和 {@link #delete} 故意抛出 {@link UnsupportedOperationException}——
+ * 所有路由变更必须经由 Admin API 写入 Nacos，不允许绕过 Nacos 直接修改内存状态。
+ */
 public class AegisRouteDefinitionRepository implements RouteDefinitionRepository {
 
     private final AtomicReference<Map<String, RouteDefinition>> routeStore =

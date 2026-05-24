@@ -98,3 +98,36 @@ AUTH (-200) → RATE_LIMIT (-100) → GRAY (-50) → EXCEPTION_HANDLER (-2)
 3. 在 `gateway-server/build.gradle` 中添加 `implementation project(':gateway-<name>')`
 4. 实现 Spring `GlobalFilter` Bean，使用 `AegisFilterOrder` 中的顺序常量
 5. 如需 Nacos 配置，通过 `NacosConfigSyncService.registerGovernanceListener()` 或 `registerGlobalListener()` 注册监听器
+
+## 注释规范
+
+**每次编写或修改代码都必须同步添加/更新注释。**
+
+### 必须注释的内容
+
+- **所有公共类**：Javadoc 说明该类在系统中的职责、设计约束和与其他组件的关系
+- **公共常量**：当常量名称本身不足以表达其取值含义或边界条件时（如 `AegisFilterOrder` 中的数字、`AegisErrorCode` 中的编码规则）
+- **非显而易见的逻辑**：隐藏约束、微妙不变量、特定 Bug 的绕过方案、会让读者意外的行为
+
+### 注释的核心原则
+
+注释解释**为什么**，不解释**是什么**。代码已经表达了"做了什么"，注释应补充"为何这样做"：
+
+```java
+// 好：解释约束和原因
+// 必须在 SCG ReactiveLoadBalancerClientFilter（10150）之前执行，将 lb:// 替换为具体实例 URI，
+// 使 SCG 默认 LB filter 检测到 URI 已解析后自动跳过，避免重复负载均衡。
+public static final int LOAD_BALANCER = 10100;
+
+// 坏：重复代码本身的含义
+// 负载均衡器的顺序值
+public static final int LOAD_BALANCER = 10100;
+```
+
+### 注释同步要求
+
+修改已有代码时，**必须同步检查并更新相关注释**：
+- 修改常量值 → 更新解释该值含义的注释
+- 修改方法行为 → 更新描述该行为的 Javadoc
+- 修改类的职责或约束 → 更新类级 Javadoc
+- 删除功能 → 删除对应注释，不要留下描述已不存在行为的"幽灵注释"

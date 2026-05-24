@@ -9,13 +9,27 @@ import org.springframework.util.StringUtils;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * 从路由 metadata 中提取的 Nacos 服务发现覆盖参数（命名空间 + 分组）。
+ * <p>
+ * 路由可在 {@code aegis-routes.json} 的 {@code metadata} 字段中声明 {@code "discovery"} 对象，
+ * 将负载均衡定向到指定命名空间/分组，从而实现命名空间级流量隔离（蓝绿、多租户等场景）。
+ * 未声明时回退到 {@link com.alibaba.cloud.nacos.NacosDiscoveryProperties} 的全局默认值。
+ * <p>
+ * 路由 metadata 示例：
+ * <pre>{@code
+ * "metadata": { "discovery": { "namespace": "prod-v2", "group": "GRAY_GROUP" } }
+ * }</pre>
+ */
 public record AegisDiscoveryMetadata(String namespace, String group) {
 
     private static final Logger log = LoggerFactory.getLogger(AegisDiscoveryMetadata.class);
 
+    /** 路由 metadata 中存放服务发现覆盖参数的顶层键名。 */
     public static final String DISCOVERY_METADATA_KEY = "discovery";
     public static final String NAMESPACE_KEY = "namespace";
     public static final String GROUP_KEY = "group";
+    /** Nacos 默认分组名，未指定 group 时使用。 */
     public static final String DEFAULT_GROUP = "DEFAULT_GROUP";
 
     public AegisDiscoveryMetadata {
