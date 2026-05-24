@@ -31,6 +31,10 @@ import java.util.concurrent.atomic.AtomicReference;
  * 从 {@code aegis-routes.json} 构建 routeId → {@link AegisDiscoveryMetadata} 快照。
  * 每个请求逐条匹配已编译规则，命中后将目标路由的服务发现坐标写入 exchange attribute，
  * 由 {@code gateway-loadbalancer} 在实例选择时优先读取。
+ * <p>
+ * 灰度路由要求 targetRouteId 引用的路由在 {@code metadata.discovery} 中显式声明
+ * {@code namespace} 和 {@code group}，不支持从 {@link com.alibaba.cloud.nacos.NacosDiscoveryProperties}
+ * 继承默认值——灰度覆盖的语义是"明确路由到不同命名空间"，未声明则视为该路由无灰度坐标（记录 warn 日志并直通）。
  */
 public class GrayRoutingFilter implements GlobalFilter, Ordered {
 
