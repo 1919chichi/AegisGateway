@@ -15,6 +15,15 @@ import reactor.core.publisher.Mono;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * 响应式链路中未捕获异常的最终兜底处理器。
+ * <p>
+ * 运行于 {@link AegisFilterOrder#EXCEPTION_HANDLER}（在 SCG 内置 Filter 之前），
+ * 将所有异常统一转换为 {@link ApiResponse} JSON，保证客户端无论异常来源
+ * 都能收到结构一致的错误响应体。
+ * <p>
+ * 若序列化本身失败，则降级输出硬编码的 JSON 字节，确保不会返回空响应。
+ */
 @Order(AegisFilterOrder.EXCEPTION_HANDLER)
 public class GlobalExceptionHandler implements WebExceptionHandler {
 
