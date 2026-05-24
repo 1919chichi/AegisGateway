@@ -1,4 +1,4 @@
-package io.aegis.gateway.loadbalancer.discovery;
+package io.aegis.gateway.core.model;
 
 import com.alibaba.cloud.nacos.NacosDiscoveryProperties;
 import org.junit.jupiter.api.Test;
@@ -13,9 +13,7 @@ class AegisDiscoveryMetadataTest {
     @Test
     void from_shouldReadNamespaceAndGroupFromRouteMetadata() {
         NacosDiscoveryProperties defaults = defaults("public", "DEFAULT_GROUP");
-        Route route = routeWithDiscovery(Map.of(
-                "namespace", "gray",
-                "group", "GROUP_A"));
+        Route route = routeWithDiscovery(Map.of("namespace", "gray", "group", "GROUP_A"));
 
         AegisDiscoveryMetadata metadata = AegisDiscoveryMetadata.from(route, defaults);
 
@@ -41,9 +39,7 @@ class AegisDiscoveryMetadataTest {
     @Test
     void from_shouldFallbackToDefaultsWhenDiscoveryMetadataHasInvalidTypes() {
         NacosDiscoveryProperties defaults = defaults("public", "DEFAULT_GROUP");
-        Route route = routeWithDiscovery(Map.of(
-                "namespace", 123,
-                "group", true));
+        Route route = routeWithDiscovery(Map.of("namespace", 123, "group", true));
 
         AegisDiscoveryMetadata metadata = AegisDiscoveryMetadata.from(route, defaults);
 
@@ -60,6 +56,12 @@ class AegisDiscoveryMetadataTest {
 
         assertThat(metadata.namespace()).isEqualTo("gray");
         assertThat(metadata.group()).isEqualTo("DEFAULT_GROUP");
+    }
+
+    @Test
+    void attrKey_shouldBeClassNameForIdeTraceability() {
+        assertThat(AegisDiscoveryMetadata.ATTR_KEY)
+                .isEqualTo("io.aegis.gateway.core.model.AegisDiscoveryMetadata");
     }
 
     private static NacosDiscoveryProperties defaults(String namespace, String group) {

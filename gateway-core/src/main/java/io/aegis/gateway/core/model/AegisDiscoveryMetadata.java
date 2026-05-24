@@ -1,4 +1,4 @@
-package io.aegis.gateway.loadbalancer.discovery;
+package io.aegis.gateway.core.model;
 
 import com.alibaba.cloud.nacos.NacosDiscoveryProperties;
 import org.slf4j.Logger;
@@ -10,22 +10,20 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * 从路由 metadata 中提取的 Nacos 服务发现覆盖参数（命名空间 + 分组）。
+ * Nacos 服务发现坐标（命名空间 + 分组），同时作为 exchange attribute 的跨模块共享契约。
  * <p>
- * 路由可在 {@code aegis-routes.json} 的 {@code metadata} 字段中声明 {@code "discovery"} 对象，
- * 将负载均衡定向到指定命名空间/分组，从而实现命名空间级流量隔离（蓝绿、多租户等场景）。
- * 未声明时回退到 {@link com.alibaba.cloud.nacos.NacosDiscoveryProperties} 的全局默认值。
- * <p>
- * 路由 metadata 示例：
- * <pre>{@code
- * "metadata": { "discovery": { "namespace": "prod-v2", "group": "GRAY_GROUP" } }
- * }</pre>
+ * 路由可在 {@code aegis-routes.json} 的 {@code metadata.discovery} 中静态声明坐标；
+ * {@code gateway-gray} 在运行时将命中灰度规则的请求坐标写入 exchange attribute（key = {@link #ATTR_KEY}），
+ * 供 {@code gateway-loadbalancer} 动态覆盖静态路由配置。
  */
 public record AegisDiscoveryMetadata(String namespace, String group) {
 
     private static final Logger log = LoggerFactory.getLogger(AegisDiscoveryMetadata.class);
 
-    /** 路由 metadata 中存放服务发现覆盖参数的顶层键名。 */
+    /**
+     * 写入 {@code ServerWebExchange.attributes} 时使用的 key，用类名保证唯一且 IDE 可追踪。
+     */
+    public static final String ATTR_KEY = AegisDiscoveryMetadata.class.getName();
     public static final String DISCOVERY_METADATA_KEY = "discovery";
     public static final String NAMESPACE_KEY = "namespace";
     public static final String GROUP_KEY = "group";
