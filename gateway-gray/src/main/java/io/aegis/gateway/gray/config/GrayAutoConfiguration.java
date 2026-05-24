@@ -1,5 +1,6 @@
 package io.aegis.gateway.gray.config;
 
+import io.aegis.gateway.core.config.AegisCoreAutoConfiguration;
 import io.aegis.gateway.core.nacos.NacosConfigSyncService;
 import io.aegis.gateway.gray.filter.GrayRoutingFilter;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,7 +18,7 @@ import tools.jackson.databind.ObjectMapper;
  * 通过 {@code spring.aegis.gray.governance-key}（默认 {@code "gray"}）指定
  * {@code aegis-governance.json} 中灰度规则节点的 key，允许用户使用语义化名称（如 canary、staging）。
  */
-@AutoConfiguration
+@AutoConfiguration(after = AegisCoreAutoConfiguration.class)
 @ConditionalOnClass(GlobalFilter.class)
 @ConditionalOnBean(NacosConfigSyncService.class)
 public class GrayAutoConfiguration {
