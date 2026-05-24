@@ -15,51 +15,13 @@
 
 | 模块 | 变更 |
 |---|---|
-| `gateway-core` | 将 `AegisDiscoveryMetadata` 从 `gateway-loadbalancer` 移入，包路径改为 `io.aegis.gateway.core.model`；新增 `GrayConfig`、`GrayRule`、`GrayMatcher` 接口、`HeaderGrayMatcher` |
+| `gateway-core` | 只做一件事：将 `AegisDiscoveryMetadata` 从 `gateway-loadbalancer` 移入，包路径改为 `io.aegis.gateway.core.model`，新增 `ATTR_KEY` 常量 |
 | `gateway-loadbalancer` | 更新 `AegisDiscoveryMetadata` import 路径；`NamespaceAwareNacosServiceInstanceListSupplier` 增加优先级读取逻辑 |
-| `gateway-gray` | 新增 `GrayRoutingFilter`、`GrayAutoConfiguration` |
+| `gateway-gray` | 新增 `GrayMatcher` 接口、`HeaderGrayMatcher`、`GrayRule`、`GrayConfig`、`GrayRoutingFilter`、`GrayAutoConfiguration` |
 
-## 核心模型（gateway-core）
+## 核心模型
 
-### GrayMatcher 接口
-
-```java
-public interface GrayMatcher {
-    boolean matches(ServerWebExchange exchange);
-}
-```
-
-扩展时只需实现此接口并在 `GrayRule.toMatcher()` 的 `switch` 中注册新 `type`，不改动 filter 主流程。
-
-### GrayRule
-
-```java
-public record GrayRule(String type, String key, String value, String targetRouteId) {
-    public GrayMatcher toMatcher() {
-        return switch (type) {
-            case "header" -> new HeaderGrayMatcher(key, value);
-            default -> throw new IllegalArgumentException("Unknown gray rule type: " + type);
-        };
-    }
-}
-```
-
-- `type`：匹配器类型，当前支持 `"header"`
-- `key`：请求头名称
-- `value`：期望值（精确匹配）
-- `targetRouteId`：命中后使用哪条路由的 `metadata.discovery` 作为服务发现坐标
-
-### GrayConfig
-
-```java
-public record GrayConfig(List<GrayRule> rules) {
-    public GrayConfig {
-        rules = rules == null ? List.of() : List.copyOf(rules);
-    }
-}
-```
-
-### AegisDiscoveryMetadata（从 gateway-loadbalancer 移入）
+### gateway-core：AegisDiscoveryMetadata（从 gateway-loadbalancer 移入）
 
 从 `io.aegis.gateway.loadbalancer.discovery` 移至 `io.aegis.gateway.core.model`，新增 exchange attribute key 常量：
 
@@ -69,6 +31,43 @@ public record AegisDiscoveryMetadata(String namespace, String group) {
     // 其余字段和逻辑不变
 }
 ```
+
+### gateway-gray：规则与匹配器
+
+```java
+// 扩展点：新增匹配类型只需实现此接口
+public interface GrayMatcher {
+    boolean matches(ServerWebExchange exchange);
+}
+
+// 当前唯一实现
+public record HeaderGrayMatcher(String key, String value) implements GrayMatcher {
+    public boolean matches(ServerWebExchange exchange) {
+        return value.equals(exchange.getRequest().getHeaders().getFirst(key));
+    }
+}
+
+// 规则模型：type 驱动 Matcher 构造
+public record GrayRule(String type, String key, String value, String targetRouteId) {
+    public GrayMatcher toMatcher() {
+        return switch (type) {
+            case "header" -> new HeaderGrayMatcher(key, value);
+            default -> throw new IllegalArgumentException("Unknown gray rule type: " + type);
+        };
+    }
+}
+
+public record GrayConfig(List<GrayRule> rules) {
+    public GrayConfig {
+        rules = rules == null ? List.of() : List.copyOf(rules);
+    }
+}
+```
+
+- `type`：匹配器类型，当前支持 `"header"`
+- `key`：请求头名称
+- `value`：期望值（精确匹配）
+- `targetRouteId`：命中后使用哪条路由的 `metadata.discovery` 作为服务发现坐标
 
 ## 路由 metadata 快照
 
@@ -138,11 +137,11 @@ public record AegisDiscoveryMetadata(String namespace, String group) {
 ## 扩展性
 
 新增匹配类型（如 JWT claim）步骤：
-1. 实现 `GrayMatcher` 接口（如 `JwtClaimGrayMatcher`），放入 `gateway-core`
+1. 在 `gateway-gray` 中实现 `GrayMatcher` 接口（如 `JwtClaimGrayMatcher`）
 2. 在 `GrayRule.toMatcher()` 的 `switch` 中添加 `case "jwt"`
 3. 配置中使用 `"type": "jwt"`
 
-filter 主流程、loadbalancer、配置模型均无需修改。
+filter 主流程、loadbalancer、`gateway-core` 均无需修改。
 
 ## 未实现（超出当前范围）
 
