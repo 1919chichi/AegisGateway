@@ -21,4 +21,16 @@ class GrayRuleTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown gray rule type: jwt");
     }
+
+    @Test
+    void constructor_shouldThrowWhenTypeIsNull() {
+        assertThatThrownBy(() -> new GrayRule(null, "X-User-Type", "beta", "user-service-canary"))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void constructor_shouldThrowWhenTargetRouteIdIsNull() {
+        assertThatThrownBy(() -> new GrayRule("header", "X-User-Type", "beta", null))
+                .isInstanceOf(NullPointerException.class);
+    }
 }

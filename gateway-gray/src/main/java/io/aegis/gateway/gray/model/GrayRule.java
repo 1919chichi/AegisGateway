@@ -3,6 +3,8 @@ package io.aegis.gateway.gray.model;
 import io.aegis.gateway.gray.matcher.GrayMatcher;
 import io.aegis.gateway.gray.matcher.HeaderGrayMatcher;
 
+import java.util.Objects;
+
 /**
  * 单条灰度路由规则。
  *
@@ -12,6 +14,11 @@ import io.aegis.gateway.gray.matcher.HeaderGrayMatcher;
  * @param targetRouteId 命中时使用哪条路由的 {@code metadata.discovery} 作为服务发现坐标
  */
 public record GrayRule(String type, String key, String value, String targetRouteId) {
+
+    public GrayRule {
+        Objects.requireNonNull(type, "type");
+        Objects.requireNonNull(targetRouteId, "targetRouteId");
+    }
 
     public GrayMatcher toMatcher() {
         return switch (type) {

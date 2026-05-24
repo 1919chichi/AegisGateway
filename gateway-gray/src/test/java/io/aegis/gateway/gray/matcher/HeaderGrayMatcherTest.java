@@ -6,6 +6,7 @@ import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.web.server.ServerWebExchange;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class HeaderGrayMatcherTest {
 
@@ -31,6 +32,18 @@ class HeaderGrayMatcherTest {
     void matches_shouldBeCaseSensitive() {
         HeaderGrayMatcher matcher = new HeaderGrayMatcher("X-User-Type", "beta");
         assertThat(matcher.matches(exchange("X-User-Type", "Beta"))).isFalse();
+    }
+
+    @Test
+    void constructor_shouldThrowWhenKeyIsNull() {
+        assertThatThrownBy(() -> new HeaderGrayMatcher(null, "beta"))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void constructor_shouldThrowWhenValueIsNull() {
+        assertThatThrownBy(() -> new HeaderGrayMatcher("X-User-Type", null))
+                .isInstanceOf(NullPointerException.class);
     }
 
     private static ServerWebExchange exchange(String headerName, String headerValue) {
