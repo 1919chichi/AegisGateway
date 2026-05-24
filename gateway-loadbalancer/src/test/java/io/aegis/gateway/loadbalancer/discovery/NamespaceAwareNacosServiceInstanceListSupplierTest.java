@@ -3,6 +3,7 @@ package io.aegis.gateway.loadbalancer.discovery;
 import com.alibaba.cloud.nacos.NacosDiscoveryProperties;
 import com.alibaba.nacos.api.naming.NamingService;
 import com.alibaba.nacos.api.naming.pojo.Instance;
+import io.aegis.gateway.core.model.AegisDiscoveryMetadata;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.loadbalancer.DefaultRequest;
