@@ -25,10 +25,14 @@ import java.util.Map;
 import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR;
 
 /**
- * 支持按路由覆盖 Nacos 命名空间/分组的 ServiceInstanceListSupplier 实现。
+ * 支持按命名空间/分组覆盖的 Nacos ServiceInstanceListSupplier 实现。
  * <p>
- * 从当前请求匹配到的 SCG Route 中读取 {@link AegisDiscoveryMetadata}，
- * 决定向哪个命名空间的 Nacos 查询服务实例。未配置覆盖时使用应用级默认值。
+ * 查询实例时按以下优先级确定目标命名空间和分组：
+ * <ol>
+ *   <li>Exchange attribute（{@link AegisDiscoveryMetadata#ATTR_KEY}，由灰度 Filter 写入）</li>
+ *   <li>SCG Route metadata（{@code metadata.discovery}，由路由配置静态指定）</li>
+ *   <li>应用级默认值（{@link NacosDiscoveryProperties}）</li>
+ * </ol>
  * <p>
  * Nacos SDK 的实例查询是阻塞调用，因此订阅在 {@code Schedulers.boundedElastic()} 上执行，
  * 避免阻塞 Reactor 事件循环线程。查询失败时降级返回空列表，由上层熔断/重试机制处理。
@@ -102,27 +106,33 @@ public class NamespaceAwareNacosServiceInstanceListSupplier implements ServiceIn
     }
 
     private Route extractRoute(Request request) {
-        if (request == null || !(request.getContext() instanceof RequestDataContext context)) {
+        Map<String, Object> attributes = extractAttributes(request);
+        if (attributes == null) {
             return null;
         }
-        RequestData requestData = context.getClientRequest();
-        if (requestData == null) {
-            return null;
-        }
-        Object route = requestData.getAttributes().get(GATEWAY_ROUTE_ATTR);
+        Object route = attributes.get(GATEWAY_ROUTE_ATTR);
         return route instanceof Route selectedRoute ? selectedRoute : null;
     }
 
     private AegisDiscoveryMetadata extractGrayMetadata(Request request) {
+        Map<String, Object> attributes = extractAttributes(request);
+        if (attributes == null) {
+            return null;
+        }
+        Object attr = attributes.get(AegisDiscoveryMetadata.ATTR_KEY);
+        return attr instanceof AegisDiscoveryMetadata m ? m : null;
+    }
+
+    /**
+     * 从 LB Request 中提取 exchange attributes，消除两处调用方的重复解包逻辑。
+     * 返回 {@code null} 表示 request 为空或上下文类型不符，调用方应按缺失情况处理。
+     */
+    private Map<String, Object> extractAttributes(Request request) {
         if (request == null || !(request.getContext() instanceof RequestDataContext context)) {
             return null;
         }
         RequestData requestData = context.getClientRequest();
-        if (requestData == null) {
-            return null;
-        }
-        Object attr = requestData.getAttributes().get(AegisDiscoveryMetadata.ATTR_KEY);
-        return attr instanceof AegisDiscoveryMetadata m ? m : null;
+        return requestData == null ? null : requestData.getAttributes();
     }
 
     private List<ServiceInstance> toServiceInstance(Instance instance, AegisDiscoveryMetadata metadata) {

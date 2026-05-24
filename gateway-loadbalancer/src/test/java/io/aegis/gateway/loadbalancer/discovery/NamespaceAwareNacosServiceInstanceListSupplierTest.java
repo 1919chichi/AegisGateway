@@ -85,6 +85,31 @@ class NamespaceAwareNacosServiceInstanceListSupplierTest {
                 .verifyComplete();
     }
 
+    @Test
+    void get_shouldUseExchangeAttributeOverRouteMetadata() throws Exception {
+        NacosDiscoveryProperties defaults = defaults("public", "DEFAULT_GROUP");
+        NacosNamingServiceRegistry registry = mock(NacosNamingServiceRegistry.class);
+        NamingService namingService = mock(NamingService.class);
+        when(registry.getNamingService(new AegisDiscoveryMetadata("prod-canary", "DEFAULT_GROUP"))).thenReturn(namingService);
+        when(namingService.selectInstances("user-service", "DEFAULT_GROUP", true)).thenReturn(List.of(instance()));
+        NamespaceAwareNacosServiceInstanceListSupplier supplier =
+                new NamespaceAwareNacosServiceInstanceListSupplier("user-service", defaults, registry);
+
+        // route metadata 指向 "gray"，exchange attribute 指向 "prod-canary"，attribute 应优先
+        StepVerifier.create(supplier.get(requestWithGrayAttribute(
+                        route("user-service-gray", "gray", "GROUP_A"),
+                        new AegisDiscoveryMetadata("prod-canary", "DEFAULT_GROUP"))).next())
+                .assertNext(instances -> {
+                    assertThat(instances).hasSize(1);
+                    assertThat(instances.getFirst().getMetadata())
+                            .containsEntry("aegis.nacos.namespace", "prod-canary")
+                            .containsEntry("aegis.nacos.group", "DEFAULT_GROUP");
+                })
+                .verifyComplete();
+
+        verify(namingService).selectInstances("user-service", "DEFAULT_GROUP", true);
+    }
+
     private static NacosDiscoveryProperties defaults(String namespace, String group) {
         NacosDiscoveryProperties properties = new NacosDiscoveryProperties();
         properties.setNamespace(namespace);
@@ -96,6 +121,15 @@ class NamespaceAwareNacosServiceInstanceListSupplierTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/users/1").build());
         exchange.getAttributes().put(GATEWAY_ROUTE_ATTR, route);
+        RequestData requestData = new RequestData(exchange.getRequest(), exchange.getAttributes());
+        return new DefaultRequest<>(new RequestDataContext(requestData, "default"));
+    }
+
+    private static Request<RequestDataContext> requestWithGrayAttribute(Route route, AegisDiscoveryMetadata grayMetadata) {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/users/1").build());
+        exchange.getAttributes().put(GATEWAY_ROUTE_ATTR, route);
+        exchange.getAttributes().put(AegisDiscoveryMetadata.ATTR_KEY, grayMetadata);
         RequestData requestData = new RequestData(exchange.getRequest(), exchange.getAttributes());
         return new DefaultRequest<>(new RequestDataContext(requestData, "default"));
     }
@@ -130,34 +164,5 @@ class NamespaceAwareNacosServiceInstanceListSupplierTest {
         instance.setClusterName("HZ");
         instance.setMetadata(Map.of("version", "v2"));
         return instance;
-    }
-
-    @Test
-    void get_shouldUseExchangeAttributeOverRouteMetadata() throws Exception {
-        NacosDiscoveryProperties defaults = defaults("public", "DEFAULT_GROUP");
-        NacosNamingServiceRegistry registry = mock(NacosNamingServiceRegistry.class);
-        NamingService namingService = mock(NamingService.class);
-        when(registry.getNamingService(new AegisDiscoveryMetadata("prod-canary", "DEFAULT_GROUP"))).thenReturn(namingService);
-        when(namingService.selectInstances("user-service", "DEFAULT_GROUP", true)).thenReturn(List.of(instance()));
-        NamespaceAwareNacosServiceInstanceListSupplier supplier =
-                new NamespaceAwareNacosServiceInstanceListSupplier("user-service", defaults, registry);
-
-        // route metadata 指向 "gray"，exchange attribute 指向 "prod-canary"，attribute 应优先
-        StepVerifier.create(supplier.get(requestWithGrayAttribute(
-                        route("user-service-gray", "gray", "GROUP_A"),
-                        new AegisDiscoveryMetadata("prod-canary", "DEFAULT_GROUP"))).next())
-                .assertNext(instances -> assertThat(instances).hasSize(1))
-                .verifyComplete();
-
-        verify(namingService).selectInstances("user-service", "DEFAULT_GROUP", true);
-    }
-
-    private static Request<RequestDataContext> requestWithGrayAttribute(Route route, AegisDiscoveryMetadata grayMetadata) {
-        MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/users/1").build());
-        exchange.getAttributes().put(GATEWAY_ROUTE_ATTR, route);
-        exchange.getAttributes().put(AegisDiscoveryMetadata.ATTR_KEY, grayMetadata);
-        RequestData requestData = new RequestData(exchange.getRequest(), exchange.getAttributes());
-        return new DefaultRequest<>(new RequestDataContext(requestData, "default"));
     }
 }
