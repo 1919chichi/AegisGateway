@@ -2,27 +2,25 @@ package io.aegis.gateway.core.exception;
 
 import io.aegis.gateway.core.filter.AegisFilterOrder;
 import io.aegis.gateway.core.model.AegisErrorCode;
-import io.aegis.gateway.core.model.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebExceptionHandler;
 import reactor.core.publisher.Mono;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
  * 响应式链路中未捕获异常的最终兜底处理器。
  * <p>
  * 运行于 {@link AegisFilterOrder#EXCEPTION_HANDLER}（在 SCG 内置 Filter 之前），
- * 将所有异常统一转换为 {@link ApiResponse} JSON，保证客户端无论异常来源
- * 都能收到结构一致的错误响应体。
+ * 将所有异常统一映射为业务错误码后交由 {@link ApiErrorResponseWriter} 写出，
+ * 保证客户端无论异常来源都能收到结构一致的错误响应体。
  * <p>
- * 若序列化本身失败，则降级输出硬编码的 JSON 字节，确保不会返回空响应。
+ * 注意：429 的 {@link ResponseStatusException} 在这里只能退化为 {@link AegisErrorCode#RATE_LIMIT_PATH}，
+ * 无法区分限流维度——因此限流 Filter 必须自行写出响应，不得抛异常走本处理器。
  */
 @Order(AegisFilterOrder.EXCEPTION_HANDLER)
 public class GlobalExceptionHandler implements WebExceptionHandler {
@@ -37,23 +35,9 @@ public class GlobalExceptionHandler implements WebExceptionHandler {
 
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
-        var response = exchange.getResponse();
-        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
-
-        AegisErrorCode errorCode = resolveErrorCode(ex);
-        response.setStatusCode(resolveHttpStatus(ex));
-
-        byte[] body;
-        try {
-            body = objectMapper.writeValueAsBytes(ApiResponse.error(errorCode));
-        } catch (JacksonException e) {
-            log.error("Failed to serialize error response", e);
-            body = ("{\"code\":50000,\"message\":\"Internal server error\",\"data\":null,\"timestamp\":"
-                    + System.currentTimeMillis() + "}").getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        }
-
         log.error("Gateway exception: {}", ex.getMessage(), ex);
-        return response.writeWith(Mono.just(response.bufferFactory().wrap(body)));
+        return ApiErrorResponseWriter.write(
+                exchange.getResponse(), resolveHttpStatus(ex), resolveErrorCode(ex), objectMapper);
     }
 
     private AegisErrorCode resolveErrorCode(Throwable ex) {

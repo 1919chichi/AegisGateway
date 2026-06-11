@@ -76,6 +76,17 @@ class NacosConfigSyncServiceTest {
     }
 
     @Test
+    void registerListener_shouldReplayCurrentSnapshotOnExecutor() {
+        // 注册即回放：监听器无需在注册后自行 get 初始值（那种模式存在新值被旧快照覆盖的竞态）
+        AtomicReference<String> received = new AtomicReference<>();
+        syncService.registerGovernanceListener(received::set);
+
+        await().atMost(2, TimeUnit.SECONDS).untilAsserted(() ->
+            assertThat(received.get()).isEqualTo("{}")
+        );
+    }
+
+    @Test
     void governanceChange_shouldNotifyRegisteredListener() throws Exception {
         ArgumentCaptor<Listener> listenerCaptor = ArgumentCaptor.forClass(Listener.class);
         verify(configService).addListener(eq(NacosConfigKeys.GOVERNANCE), eq(NacosConfigKeys.DEFAULT_GROUP), listenerCaptor.capture());

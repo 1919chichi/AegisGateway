@@ -30,6 +30,10 @@ import tools.jackson.databind.ObjectMapper;
  * <p>
  * 其他模块通过 {@link #registerRoutesListener}、{@link #registerGovernanceListener}、
  * {@link #registerGlobalListener} 注册回调，即可在配置热更新时收到通知。
+ * <p>
+ * 注册时会在对应配置的串行 Executor 上向新监听器回放当前快照：监听器不需要（也不应该）
+ * 在注册后自行调用 getter 拉取初始值——“注册后再读取”会与并发到达的 Nacos 推送产生
+ * 新值被旧快照覆盖的竞态；回放与后续更新在同一单线程 Executor 上串行，天然有序。
  */
 public class NacosConfigSyncService {
 
@@ -153,14 +157,18 @@ public class NacosConfigSyncService {
 
     public void registerRoutesListener(Consumer<AegisRoutesConfig> listener) {
         routesListeners.add(listener);
+        // 在串行 Executor 上回放当前快照（执行时取最新值），与后续推送有序，消除注册期竞态
+        routesExecutor.execute(() -> listener.accept(routesConfig.get()));
     }
 
     public void registerGovernanceListener(Consumer<String> listener) {
         governanceListeners.add(listener);
+        governanceExecutor.execute(() -> listener.accept(governanceConfigJson.get()));
     }
 
     public void registerGlobalListener(Consumer<GlobalConfig> listener) {
         globalListeners.add(listener);
+        globalExecutor.execute(() -> listener.accept(globalConfig.get()));
     }
 
     @PreDestroy
