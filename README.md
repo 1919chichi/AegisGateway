@@ -6,7 +6,7 @@
 
 - **动态路由**：所有路由配置存储在 Nacos，实时推送无需重启
 - **JWT 认证**：可配置的路径排除规则
-- **分布式限流**：基于 Redisson（Redis）
+- **分布式限流**：基于 Redisson（Redis）的策略化限流，支持服务 / 路径 / 用户三个维度，Redis 故障时 fail-open
 - **熔断**：基于 Resilience4j
 - **负载均衡**：基于 Nacos 服务发现 + Spring Cloud LoadBalancer
 - **灰度路由**：金丝雀流量分流
@@ -170,6 +170,91 @@ docker run -p 8080:8080 \
 ```
 
 `Weight` 只控制虚拟路由命中比例；命中某条虚拟路由后，`gateway-loadbalancer` 只读取该路由 `metadata.discovery.namespace` 指定 namespace 下的健康实例。
+
+### 限流配置（`aegis-routes.json` + `aegis-governance.json`）
+
+限流采用**策略绑定**模型：路由只通过 `metadata.rateLimit.policyId` 绑定一个策略组，具体限流规则统一放在 `aegis-governance.json` 中维护，支持 Nacos 热更新——调整限流参数不需要改动路由配置。
+
+路由侧只需绑定策略 ID：
+
+```json
+{
+  "routes": [
+    {
+      "id": "user-service",
+      "uri": "lb://user-service",
+      "predicates": ["Path=/api/users/**"],
+      "filters": ["StripPrefix=1"],
+      "metadata": {
+        "rateLimit": {
+          "policyId": "user-service-policy"
+        }
+      }
+    }
+  ]
+}
+```
+
+治理配置侧定义 Redis 连接和策略规则（`aegis-governance.json`）：
+
+```json
+{
+  "rateLimitRedis": {
+    "address": "redis://127.0.0.1:6379",
+    "password": null,
+    "database": 0
+  },
+  "rateLimitPolicies": [
+    {
+      "id": "user-service-policy",
+      "rules": [
+        {
+          "id": "user-service-total",
+          "type": "SERVICE",
+          "capacity": 1000,
+          "refillRate": 500
+        },
+        {
+          "id": "user-login-path",
+          "type": "PATH",
+          "pathPattern": "/api/users/login",
+          "capacity": 50,
+          "refillRate": 10
+        },
+        {
+          "id": "user-api-per-user",
+          "type": "USER",
+          "capacity": 60,
+          "refillRate": 10,
+          "identityHeader": "X-User-Id"
+        }
+      ]
+    }
+  ]
+}
+```
+
+每条规则是一个 Redis 令牌桶（Lua 脚本实现，多网关实例共享状态）：`capacity` 为桶容量（允许的突发量），`refillRate` 为每秒补充令牌数（近似稳定 QPS）。
+
+三种限流维度：
+
+| `type` | 语义 | 命中条件 |
+|---|---|---|
+| `SERVICE` | 限制下游服务总请求量 | 绑定该策略的路由的所有请求 |
+| `PATH` | 限制单个 URL 模式（`pathPattern`，Spring `PathPattern` 语法） | 原始请求 path 匹配 `pathPattern` |
+| `USER` | 限制单个用户请求频率（用户标识取自 `identityHeader`，默认 `X-User-Id`，缺失时共享匿名桶） | 所有请求，按用户区分令牌桶 |
+
+放行采用 **AND 语义**：本次请求命中的所有规则都获取到令牌才放行，任一规则失败返回 `429` + 统一 `ApiResponse`，错误码按失败规则类型区分：
+
+| 失败规则类型 | 错误码 |
+|---|---|
+| `PATH` | `42901` |
+| `SERVICE` | `42902` |
+| `USER` | `42903` |
+
+**fail-open 与启动解耦**：限流是保护手段，不构成新的单点故障——路由未绑定策略、策略不存在、未配置 `rateLimitRedis`、Redis 不可用或扣令牌异常时一律放行。网关启动完全不依赖 Redis：Redis 客户端按治理配置惰性创建，没有限流策略时根本不建连；Redis 恢复后限流自动生效。
+
+更多细节（key 设计、多规则扣减边界、热更新机制）见 [限流策略设计文档](docs/superpowers/specs/2026-06-11-redisson-rate-limit-policy-design.md)。
 
 ### 全局配置示例（`aegis-global.json`）
 
