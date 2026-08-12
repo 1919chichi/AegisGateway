@@ -1660,7 +1660,7 @@ git commit -m "feat(loadbalancer): add ConsistentHashReactiveLoadBalancer"
 - Consumes: `LoadBalancePolicyRepository`（Task 5）、`ConsistentHashReactiveLoadBalancer`（Task 7）、`NacosConfigSyncService`（`gateway-core`）
 - Produces: `AegisLoadBalancerAutoConfiguration` 注册全局唯一的 `LoadBalancePolicyRepository` bean；`AegisNamespaceLoadBalancerClientConfiguration` 为每个 serviceId 注册 `ConsistentHashReactiveLoadBalancer` 作为 `ReactiveLoadBalancer<ServiceInstance>`
 
-- [ ] **Task 8 Step 1: 写失败测试**
+- [x] **Task 8 Step 1: 写失败测试**
 
 在现有 `gateway-loadbalancer/src/test/java/io/aegis/gateway/loadbalancer/config/AegisLoadBalancerAutoConfigurationTest.java` 中追加以下内容（保留原有类和测试方法不动）：
 
@@ -1718,12 +1718,12 @@ import tools.jackson.databind.ObjectMapper;
     }
 ```
 
-- [ ] **Task 8 Step 2: 运行测试确认失败**
+- [x] **Task 8 Step 2: 运行测试确认失败**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.config.AegisLoadBalancerAutoConfigurationTest"`
 Expected: 编译失败（`LoadBalancePolicyRepository` bean 方法、`aegisConsistentHashLoadBalancer` 方法均不存在）
 
-- [ ] **Task 8 Step 3: 修改 AegisLoadBalancerAutoConfiguration**
+- [x] **Task 8 Step 3: 修改 AegisLoadBalancerAutoConfiguration**
 
 将 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/config/AegisLoadBalancerAutoConfiguration.java` 整体替换为：
 
@@ -1786,7 +1786,7 @@ public class AegisLoadBalancerAutoConfiguration {
 }
 ```
 
-- [ ] **Task 8 Step 4: 修改 AegisNamespaceLoadBalancerClientConfiguration**
+- [x] **Task 8 Step 4: 修改 AegisNamespaceLoadBalancerClientConfiguration**
 
 将 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/config/AegisNamespaceLoadBalancerClientConfiguration.java` 整体替换为：
 
@@ -1847,17 +1847,17 @@ public class AegisNamespaceLoadBalancerClientConfiguration {
 }
 ```
 
-- [ ] **Task 8 Step 5: 运行测试确认通过**
+- [x] **Task 8 Step 5: 运行测试确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.config.AegisLoadBalancerAutoConfigurationTest"`
 Expected: PASS（全部测试通过，含原有 2 个 + 新增 3 个）
 
-- [ ] **Task 8 Step 6: 运行整个模块测试确认无回归**
+- [x] **Task 8 Step 6: 运行整个模块测试确认无回归**
 
 Run: `./gradlew :gateway-loadbalancer:test`
 Expected: BUILD SUCCESSFUL，全部测试通过
 
-- [ ] **Task 8 Step 7: Commit**
+- [x] **Task 8 Step 7: Commit**
 
 ```bash
 git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/config/AegisLoadBalancerAutoConfiguration.java \
