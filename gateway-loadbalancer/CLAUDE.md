@@ -13,6 +13,44 @@
 | `discovery/NamespaceAwareNacosServiceInstanceListSupplier` | 核心 `ServiceInstanceListSupplier`，负责按命名空间/分组查询 Nacos 实例 |
 | `discovery/NacosNamingServiceRegistry` | 按命名空间缓存并复用 `NamingService`（创建成本高、含长连接），`@PreDestroy` 时统一关闭 |
 
+## 一致性哈希负载均衡
+
+按 serviceId 可选启用，配置来自 `aegis-governance.json` 的 `loadBalancePolicies` 节点，通过 `LoadBalancePolicyRepository`（监听 `NacosConfigSyncService.registerGovernanceListener`）热更新。未配置 policy 的 serviceId 行为不变，仍是 SCG 默认 `RoundRobinLoadBalancer`。
+
+配置 schema（`aegis-governance.json` 片段）：
+
+```json
+{
+  "loadBalancePolicies": [
+    {
+      "serviceId": "order-service",
+      "strategy": "CONSISTENT_HASH",
+      "keySource": "HEADER",
+      "keyName": "X-User-Id",
+      "virtualNodesPerWeight": 160
+    }
+  ]
+}
+```
+
+- `keySource`：`CLIENT_IP`（读 `X-Forwarded-For` 请求头第一个值；当前依赖的 `spring-cloud-loadbalancer` 版本下 `RequestData` 不携带原始连接远端地址，只能走这个头，没有反向代理写入时会判定 key 缺失）或 `HEADER`（读 `keyName` 指定的请求头，此时 `keyName` 必填）。
+- `virtualNodesPerWeight`：缺省 160（`LoadBalancePolicy.DEFAULT_VIRTUAL_NODES_PER_WEIGHT`），每个实例的虚拟节点数 = 该值 × 实例权重（权重来自 `ServiceInstance.getMetadata().get("nacos.weight")`，缺失或非法时按 1.0 处理）。
+
+| 类（`hash` 包） | 作用 |
+|---|---|
+| `hash/MurmurHash3` | 包内可见的哈希函数（32-bit x86 变体），供 `ConsistentHashRing` 计算虚拟节点/key 在环上的位置 |
+| `hash/ConsistentHashRing` | 哈希环：`TreeMap<Long, ServiceInstance>` + 虚拟节点 + 权重，`build()`/`route()` 两个静态/实例方法 |
+| `hash/HashKeyExtractor` + `hash/DefaultHashKeyExtractor` | 按 policy 的 `keySource` 从请求提取哈希 key，取不到返回空（不抛异常） |
+
+| 类（`loadbalance` 包） | 作用 |
+|---|---|
+| `loadbalance/LoadBalancePolicy` / `LoadBalanceGovernanceConfig` | governance policy 模型（record），`LoadBalanceStrategy`/`HashKeySource` 是配套枚举 |
+| `loadbalance/LoadBalancePolicyRepository` | 监听 Nacos governance，维护按 serviceId 索引的 policy 快照，全局唯一实例，在 `AegisLoadBalancerAutoConfiguration` 注册 |
+| `loadbalance/ConsistentHashReactiveLoadBalancer` | `ReactiveLoadBalancer<ServiceInstance>` 实现，按 serviceId 装配在 `AegisNamespaceLoadBalancerClientConfiguration` 中；内部持有 `RoundRobinLoadBalancer` 作为"policy 未配置"和"key 缺失降级"两种场景的统一委托对象；环用 Caffeine `Cache<String, ConsistentHashRing>`（`maximumSize(2)`）按实例集合+权重+虚拟节点数缓存，避免每次请求重建 |
+| `loadbalance/HashKeyMissingLogger` | 按 serviceId 限流的 WARN 日志（默认 30s 窗口），key 缺失降级时提示配置可能有误 |
+
+`AegisFilterOrder.LOAD_BALANCER = 10100` 仍然是预留但从未使用的顺序常量——一致性哈希是通过标准 `ReactiveLoadBalancer` 扩展点接入的（与命名空间感知 Supplier 同一挂载方式），不依赖这个 Filter 顺序常量，本次改动也没有采用它。
+
 ## 命名空间感知发现机制
 
 `NamespaceAwareNacosServiceInstanceListSupplier.loadInstances()` 按以下**优先级**确定目标 namespace + group（坐标封装为 `gateway-core` 的 `AegisDiscoveryMetadata` record）：
