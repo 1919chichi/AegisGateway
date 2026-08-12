@@ -1,115 +1,126 @@
 # AegisGateway
 
-基于 **Spring Cloud Gateway（WebFlux）** 的响应式 API 网关，以 Nacos 作为唯一配置中心，运行于 **Java 25**，充分利用虚拟线程与 Structured Concurrency。
+**English** | [简体中文](README.zh-CN.md)
 
-## 特性
+A reactive API gateway built on **Spring Cloud Gateway (WebFlux)**, with Nacos as its single configuration source. It runs on **Java 25** and makes use of virtual threads and Structured Concurrency.
 
-- **动态路由**：所有路由配置存储在 Nacos，实时推送无需重启
-- **JWT 认证**：可配置的路径排除规则
-- **分布式限流**：基于 Redisson（Redis）的策略化限流，支持服务 / 路径 / 用户三个维度，Redis 故障时 fail-open
-- **熔断**：基于 Resilience4j
-- **负载均衡**：基于 Nacos 服务发现 + Spring Cloud LoadBalancer
-- **灰度路由**：金丝雀流量分流
-- **请求/响应转换**：Header 改写、Body 映射
-- **流量镜像**：异步镜像流量至影子服务
-- **Admin API**：通过 REST 接口管理 Nacos 配置
-- **并行配置加载**：启动时使用 Java 25 Structured Concurrency 并行拉取所有配置，任一失败则整体失败
+## Features
 
-## 模块结构
+- **Dynamic routing**: all route definitions live in Nacos and are refreshed in real time without restarting the gateway
+- **JWT authentication**: configurable path exclusions
+- **Distributed rate limiting**: policy-based Redisson/Redis rate limiting across service, path, and user dimensions, with fail-open behavior when Redis is unavailable
+- **Circuit breaking**: powered by Resilience4j
+- **Load balancing**: Nacos service discovery with Spring Cloud LoadBalancer, including instance-weighted consistent hashing and automatic round-robin fallback
+- **Gray/canary routing**: controlled traffic splitting
+- **Request/response transformation**: header rewriting and body mapping
+- **Traffic mirroring**: asynchronous request mirroring to shadow services
+- **Admin API**: REST endpoints for managing Nacos-backed configuration
+- **Parallel configuration loading**: Java 25 Structured Concurrency loads all configuration sets in parallel at startup and fails the startup atomically if any load fails
 
-```
+## Modules
+
+```text
 aegis-gateway/
-├── gateway-core          # 核心库：Nacos 配置同步、路由仓库、全局异常处理、共享模型
-├── gateway-server        # 唯一可启动的 Spring Boot 应用，聚合所有模块
-├── gateway-ratelimit     # 分布式限流（Redisson / Redis）
-├── gateway-circuitbreaker# 熔断（Resilience4j）
-├── gateway-loadbalancer  # 服务发现负载均衡（Nacos + Spring Cloud LoadBalancer）
-├── gateway-gray          # 灰度 / 金丝雀路由
-├── gateway-auth          # JWT 认证
-├── gateway-transform     # 请求 / 响应转换
-├── gateway-mirror        # 流量镜像
-└── gateway-admin         # 配置管理 Admin REST API
+├── gateway-core           # Nacos sync, route repository, error handling, shared models
+├── gateway-server         # The only runnable Spring Boot application; assembles all modules
+├── gateway-ratelimit      # Distributed rate limiting with Redisson/Redis
+├── gateway-circuitbreaker # Circuit breaking with Resilience4j
+├── gateway-loadbalancer   # Namespace-aware and consistent-hash load balancing
+├── gateway-gray           # Gray/canary routing
+├── gateway-auth           # JWT authentication
+├── gateway-transform      # Request/response transformation
+├── gateway-mirror         # Traffic mirroring
+├── gateway-admin          # Configuration management Admin REST API
+└── namespace-demo-service # Local demo service for multi-namespace routing
 ```
 
-## 技术栈
+## Technology Stack
 
-| 组件 | 版本 | 用途 |
+| Component | Version | Purpose |
 |---|---|---|
-| Java | 25（`--enable-preview`） | Records、虚拟线程、Structured Concurrency |
-| Spring Boot | 4.0.6 | 应用框架 |
-| Spring Cloud | 2025.1.1 | Gateway、LoadBalancer、CircuitBreaker |
-| Spring Cloud Alibaba | 2025.1.0.0 | Nacos 服务发现 + 动态配置 |
-| Nacos Client | 3.1.1 | 配置监听、服务注册 |
-| Redisson | 4.4.0 | 分布式限流（Redis 客户端） |
-| Resilience4j | 2.3.0 | 熔断 |
-| Project Reactor | _随 Spring Boot BOM_ | 全链路响应式 |
+| Java | 25 (`--enable-preview`) | Records, virtual threads, Structured Concurrency |
+| Spring Boot | 4.0.6 | Application framework |
+| Spring Cloud | 2025.1.1 | Gateway, LoadBalancer, CircuitBreaker |
+| Spring Cloud Alibaba | 2025.1.0.0 | Nacos service discovery and dynamic configuration |
+| Nacos Client | 3.1.1 | Configuration listeners and service registration |
+| Redisson | 4.4.0 | Redis client for distributed rate limiting |
+| Resilience4j | 2.3.0 | Circuit breaking |
+| Project Reactor | _Managed by the Spring Boot BOM_ | End-to-end reactive processing |
 
-## 快速开始
+## Quick Start
 
-### 前置依赖
+### Prerequisites
 
 - JDK 25+
-- Docker Compose（用于本地启动 Nacos 和 Redis）
+- Docker Compose, for running Nacos and Redis locally
 
-### 启动本地基础设施
+### Start Local Infrastructure
 
 ```bash
 docker compose up -d nacos redis
 ```
 
-默认端口：
+Default endpoints:
 
-| 服务 | 地址 |
+| Service | Address |
 |---|---|
 | Nacos API | `127.0.0.1:8848` |
-| Nacos 控制台 | `http://127.0.0.1:18080/` |
+| Nacos console | `http://127.0.0.1:18080/` |
 | Redis | `127.0.0.1:6379` |
 
-### 构建
+### Build
+
+Build the executable Spring Boot JAR:
 
 ```bash
 ./gradlew :gateway-server:bootJar
 ```
 
-### 启动
+Or run the gateway directly through Gradle. The build config supplies the required Java 25 preview flags:
+
+```bash
+./gradlew :gateway-server:bootRun
+```
+
+### Run the JAR
 
 ```bash
 java --enable-preview -jar gateway-server/build/libs/gateway-server-*.jar
 ```
 
-### 环境变量
+### Environment Variables
 
-| 变量 | 默认值 | 说明 |
+| Variable | Default | Description |
 |---|---|---|
-| `NACOS_SERVER_ADDR` | `127.0.0.1:8848` | Nacos 服务地址 |
-| `NACOS_NAMESPACE` | _（空）_ | Nacos 命名空间 |
-| `AEGIS_NACOS_GROUP` | `aegis` | 所有 Aegis 配置使用的 Nacos Group |
+| `NACOS_SERVER_ADDR` | `127.0.0.1:8848` | Nacos server address |
+| `NACOS_NAMESPACE` | _(empty)_ | Nacos namespace |
+| `AEGIS_NACOS_GROUP` | `aegis` | Nacos group for all Aegis configuration |
 
 ### Docker
 
 ```bash
-# 先构建 JAR，再构建镜像
+# Build the JAR before building the image
 ./gradlew :gateway-server:bootJar
 docker build -t aegis-gateway .
 
-# 运行
+# Run the image
 docker run -p 8080:8080 \
   -e NACOS_SERVER_ADDR=<nacos-host>:8848 \
   -e AEGIS_NACOS_GROUP=aegis \
   aegis-gateway
 ```
 
-## Nacos 配置
+## Nacos Configuration
 
-网关从以下三个 Data ID 读取配置（Group 由 `AEGIS_NACOS_GROUP` 决定，默认 `aegis`）：
+The gateway reads three Data IDs. Their group is controlled by `AEGIS_NACOS_GROUP` and defaults to `aegis`.
 
-| Data ID | 格式 | 说明 |
+| Data ID | Format | Description |
 |---|---|---|
-| `aegis-routes.json` | JSON | 路由定义列表 |
-| `aegis-governance.json` | JSON | 治理配置（限流、熔断等模块自行解析） |
-| `aegis-global.json` | JSON | 全局配置：CORS、JWT 密钥、Admin API Key |
+| `aegis-routes.json` | JSON | Route definitions |
+| `aegis-governance.json` | JSON | Governance settings parsed by modules such as rate limiting and load balancing |
+| `aegis-global.json` | JSON | Global CORS, JWT secret, and Admin API key settings |
 
-### 路由配置示例（`aegis-routes.json`）
+### Route Example (`aegis-routes.json`)
 
 ```json
 {
@@ -126,9 +137,9 @@ docker run -p 8080:8080 \
 }
 ```
 
-### 多 namespace 权重路由示例
+### Weighted Multi-Namespace Routing
 
-同一个服务名可以拆成多条虚拟路由，通过 SCG `Weight` 控制 namespace 级流量比例。下面配置会把 `/api/users/**` 的流量按 80:20 分到 `dev` 和 `gray` namespace，两个 namespace 内仍调用同一个 `lb://user-service`。
+A service name can be represented by multiple virtual routes. The Spring Cloud Gateway `Weight` predicate controls traffic distribution between namespaces. This example sends `/api/users/**` traffic to the `dev` and `gray` namespaces at an 80:20 ratio while both routes still target `lb://user-service`.
 
 ```json
 {
@@ -169,13 +180,33 @@ docker run -p 8080:8080 \
 }
 ```
 
-`Weight` 只控制虚拟路由命中比例；命中某条虚拟路由后，`gateway-loadbalancer` 只读取该路由 `metadata.discovery.namespace` 指定 namespace 下的健康实例。
+`Weight` only selects a virtual route. Once selected, `gateway-loadbalancer` discovers healthy instances exclusively from the namespace specified by that route's `metadata.discovery.namespace`.
 
-### 限流配置（`aegis-routes.json` + `aegis-governance.json`）
+### Consistent-Hash Load Balancing (`aegis-governance.json`)
 
-限流采用**策略绑定**模型：路由只通过 `metadata.rateLimit.policyId` 绑定一个策略组，具体限流规则统一放在 `aegis-governance.json` 中维护，支持 Nacos 热更新——调整限流参数不需要改动路由配置。
+Enable weighted consistent hashing per Nacos `serviceId`, using either a request header or the client IP as the session-affinity key:
 
-路由侧只需绑定策略 ID：
+```json
+{
+  "loadBalancePolicies": [
+    {
+      "serviceId": "order-service",
+      "strategy": "CONSISTENT_HASH",
+      "keySource": "HEADER",
+      "keyName": "X-User-Id",
+      "virtualNodesPerWeight": 160
+    }
+  ]
+}
+```
+
+`keySource` supports `HEADER` and `CLIENT_IP`. `CLIENT_IP` reads the first address from `X-Forwarded-For`, so the upstream proxy must set that header correctly. `virtualNodesPerWeight` defaults to 160 and combines with each Nacos instance weight to determine its virtual-node count. If no policy exists, the hash key cannot be extracted, or consistent-hash routing fails, the gateway fails open to standard round-robin load balancing.
+
+### Rate Limiting (`aegis-routes.json` + `aegis-governance.json`)
+
+Rate limiting follows a **policy-binding** model. A route references a policy group through `metadata.rateLimit.policyId`, while the actual rules live in `aegis-governance.json`. Rules are hot-reloaded from Nacos, so changing limits does not require editing route definitions.
+
+Bind a route to a policy:
 
 ```json
 {
@@ -195,7 +226,7 @@ docker run -p 8080:8080 \
 }
 ```
 
-治理配置侧定义 Redis 连接和策略规则（`aegis-governance.json`）：
+Define the Redis connection and policy rules in the governance configuration:
 
 ```json
 {
@@ -234,29 +265,27 @@ docker run -p 8080:8080 \
 }
 ```
 
-每条规则是一个 Redis 令牌桶（Lua 脚本实现，多网关实例共享状态）：`capacity` 为桶容量（允许的突发量），`refillRate` 为每秒补充令牌数（近似稳定 QPS）。
+Each rule is a Redis token bucket implemented with Lua and shared by all gateway instances. `capacity` controls burst size; `refillRate` is the number of tokens added per second and approximates steady-state QPS.
 
-三种限流维度：
-
-| `type` | 语义 | 命中条件 |
+| `type` | Meaning | Match condition |
 |---|---|---|
-| `SERVICE` | 限制下游服务总请求量 | 绑定该策略的路由的所有请求 |
-| `PATH` | 限制单个 URL 模式（`pathPattern`，Spring `PathPattern` 语法） | 原始请求 path 匹配 `pathPattern` |
-| `USER` | 限制单个用户请求频率（用户标识取自 `identityHeader`，默认 `X-User-Id`，缺失时共享匿名桶） | 所有请求，按用户区分令牌桶 |
+| `SERVICE` | Limits total traffic to the downstream service | Every request to a route bound to the policy |
+| `PATH` | Limits a URL pattern using Spring `PathPattern` syntax | Original request path matches `pathPattern` |
+| `USER` | Limits each user, identified by `identityHeader` (default `X-User-Id`) | Every request, with missing identities sharing an anonymous bucket |
 
-放行采用 **AND 语义**：本次请求命中的所有规则都获取到令牌才放行，任一规则失败返回 `429` + 统一 `ApiResponse`，错误码按失败规则类型区分：
+All matched rules use **AND semantics**: a request passes only when every matching bucket grants a token. Otherwise the gateway returns `429` with the unified `ApiResponse` and a type-specific error code:
 
-| 失败规则类型 | 错误码 |
+| Failed rule type | Error code |
 |---|---|
 | `PATH` | `42901` |
 | `SERVICE` | `42902` |
 | `USER` | `42903` |
 
-**fail-open 与启动解耦**：限流是保护手段，不构成新的单点故障——路由未绑定策略、策略不存在、未配置 `rateLimitRedis`、Redis 不可用或扣令牌异常时一律放行。网关启动完全不依赖 Redis：Redis 客户端按治理配置惰性创建，没有限流策略时根本不建连；Redis 恢复后限流自动生效。
+**Fail-open startup isolation**: rate limiting is protective infrastructure, not a new single point of failure. Requests pass when a route has no binding, a policy is missing, `rateLimitRedis` is absent, Redis is unavailable, or token acquisition fails. Redis connections are created lazily only when rate-limiting policies exist, and rate limiting recovers automatically after Redis becomes available again.
 
-更多细节（key 设计、多规则扣减边界、热更新机制）见 [限流策略设计文档](docs/superpowers/specs/2026-06-11-redisson-rate-limit-policy-design.md)。
+See the [rate-limit policy design](docs/superpowers/specs/2026-06-11-redisson-rate-limit-policy-design.md) for key design, multi-rule deduction boundaries, and hot-reload details.
 
-### 全局配置示例（`aegis-global.json`）
+### Global Configuration (`aegis-global.json`)
 
 ```json
 {
@@ -274,47 +303,47 @@ docker run -p 8080:8080 \
 }
 ```
 
-> **注意**：路由的增删必须通过 Admin API → Nacos，不支持直接调用 Spring Cloud Gateway 的路由仓库接口（`save`/`delete` 会抛 `UnsupportedOperationException`）。
+> **Note:** route creation and deletion must go through the Admin API and Nacos. Calling the Spring Cloud Gateway route repository directly is unsupported; `save` and `delete` throw `UnsupportedOperationException`.
 
-## Filter 执行顺序
+## Filter Order
 
-```
+```text
 AUTH (-200) → RATE_LIMIT (-100) → GRAY (-50) → EXCEPTION_HANDLER (-2)
-  → [SCG 内置 Filter]
+  → [built-in SCG filters]
   → CIRCUIT_BREAKER (10050) → RETRY (10300) → MIRROR (10400)
 ```
 
-## 路由更新生命周期
+## Route Update Lifecycle
 
-```
-Nacos 推送变更
-  → NacosConfigSyncService 反序列化
-  → AegisRouteDefinitionRepository 原子替换内存路由 Map
-  → 发布 RefreshRoutesEvent
-  → Spring Cloud Gateway 重新加载路由
+```text
+Nacos pushes a change
+  → NacosConfigSyncService deserializes it
+  → AegisRouteDefinitionRepository atomically replaces the in-memory route map
+  → RefreshRoutesEvent is published
+  → Spring Cloud Gateway reloads routes
 ```
 
-## 测试
+## Testing
 
 ```bash
-# 运行所有测试
+# Run the complete test suite
 ./gradlew test
 
-# 运行单个模块
+# Test one module
 ./gradlew :gateway-core:test
 
-# 运行单个测试类
+# Run one test class
 ./gradlew :gateway-core:test --tests "io.aegis.gateway.core.route.AegisRouteDefinitionRepositoryTest"
 ```
 
-## 新增功能模块
+## Adding a Feature Module
 
-1. 创建模块目录，在 `build.gradle` 中添加 `implementation project(':gateway-core')`
-2. 在 `settings.gradle` 中注册 `include 'gateway-<name>'`
-3. 在 `gateway-server/build.gradle` 中添加 `implementation project(':gateway-<name>')`
-4. 实现 `GlobalFilter` Bean，使用 `AegisFilterOrder` 中的顺序常量
-5. 如需 Nacos 配置，通过 `NacosConfigSyncService.registerGovernanceListener()` 或 `registerGlobalListener()` 注册监听器
+1. Create the module directory and add `implementation project(':gateway-core')` to its `build.gradle`.
+2. Register it with `include 'gateway-<name>'` in `settings.gradle`.
+3. Add `implementation project(':gateway-<name>')` to `gateway-server/build.gradle`.
+4. Implement a `GlobalFilter` bean using the appropriate order constant from `AegisFilterOrder`.
+5. For Nacos-backed configuration, register a listener through `NacosConfigSyncService.registerGovernanceListener()` or `registerGlobalListener()`.
 
-## 许可证
+## License
 
-本项目仅供学习与参考。
+This project is provided for learning and reference purposes only.
