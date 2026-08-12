@@ -1,6 +1,8 @@
 package io.aegis.gateway.loadbalancer.loadbalance;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.aegis.gateway.loadbalancer.hash.ConsistentHashRing;
 import io.aegis.gateway.loadbalancer.hash.DefaultHashKeyExtractor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -102,6 +104,29 @@ class ConsistentHashReactiveLoadBalancerTest {
     }
 
     @Test
+    void choose_shouldNotQuerySupplier_whenKeyMissing() {
+        LoadBalancePolicy policy = new LoadBalancePolicy(
+                SERVICE_ID, LoadBalanceStrategy.CONSISTENT_HASH, HashKeySource.HEADER, "X-User-Id", 160);
+        when(policyRepository.findByServiceId(SERVICE_ID)).thenReturn(Optional.of(policy));
+        ServiceInstanceListSupplier supplier = mock(ServiceInstanceListSupplier.class);
+        when(supplier.get(any())).thenReturn(Flux.just(List.of(instance("10.0.0.1", 8080, null))));
+        when(supplierProvider.getIfAvailable()).thenReturn(supplier);
+        ServiceInstance fallback = instance("10.0.0.9", 8080, null);
+        when(delegate.choose(any())).thenReturn(Mono.just(new DefaultResponse(fallback)));
+        ConsistentHashReactiveLoadBalancer loadBalancer = newLoadBalancer(delegate, new HashKeyMissingLogger());
+        // 请求没有携带 policy 要求的 X-User-Id header：key 提取完全不依赖实例列表，
+        // 这条路径下不应该查询 supplier（否则加上 delegate 内部自己的查询就是两次 Nacos 查询）
+        Request<RequestDataContext> request = requestWithHeader("X-Other-Header", "irrelevant");
+
+        StepVerifier.create(loadBalancer.choose(request))
+                .assertNext(response -> assertThat(response.getServer()).isEqualTo(fallback))
+                .verifyComplete();
+
+        verify(delegate).choose(request);
+        verifyNoInteractions(supplier);
+    }
+
+    @Test
     void choose_shouldOnlyCallMissingLoggerOncePerCall_andDelegateThrottlingToIt() {
         LoadBalancePolicy policy = new LoadBalancePolicy(
                 SERVICE_ID, LoadBalanceStrategy.CONSISTENT_HASH, HashKeySource.HEADER, "X-User-Id", 160);
@@ -185,6 +210,32 @@ class ConsistentHashReactiveLoadBalancerTest {
                 assertThat(after).isNotEqualTo(removed);
             }
         }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void choose_shouldDegradeToRoundRobin_whenRingCacheThrows() {
+        LoadBalancePolicy policy = new LoadBalancePolicy(
+                SERVICE_ID, LoadBalanceStrategy.CONSISTENT_HASH, HashKeySource.HEADER, "X-User-Id", 160);
+        when(policyRepository.findByServiceId(SERVICE_ID)).thenReturn(Optional.of(policy));
+        List<ServiceInstance> instances = List.of(instance("10.0.0.1", 8080, null));
+        ServiceInstanceListSupplier supplier = mock(ServiceInstanceListSupplier.class);
+        when(supplier.get(any())).thenReturn(Flux.just(instances));
+        when(supplierProvider.getIfAvailable()).thenReturn(supplier);
+        Cache<String, ConsistentHashRing> ringCache = mock(Cache.class);
+        when(ringCache.get(any(), any())).thenThrow(new RuntimeException("ring build boom"));
+        ServiceInstance fallback = instance("10.0.0.9", 8080, null);
+        when(delegate.choose(any())).thenReturn(Mono.just(new DefaultResponse(fallback)));
+        ConsistentHashReactiveLoadBalancer loadBalancer = new ConsistentHashReactiveLoadBalancer(
+                supplierProvider, SERVICE_ID, policyRepository, delegate, new DefaultHashKeyExtractor(),
+                new HashKeyMissingLogger(), ringCache);
+        Request<RequestDataContext> request = requestWithHeader("X-User-Id", "u1");
+
+        StepVerifier.create(loadBalancer.choose(request))
+                .assertNext(response -> assertThat(response.getServer()).isEqualTo(fallback))
+                .verifyComplete();
+
+        verify(delegate).choose(request);
     }
 
     private ConsistentHashReactiveLoadBalancer newLoadBalancer(RoundRobinLoadBalancer delegate,

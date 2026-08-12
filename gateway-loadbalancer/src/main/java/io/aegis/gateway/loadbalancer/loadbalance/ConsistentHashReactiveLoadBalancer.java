@@ -5,13 +5,15 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import io.aegis.gateway.loadbalancer.hash.ConsistentHashRing;
 import io.aegis.gateway.loadbalancer.hash.DefaultHashKeyExtractor;
 import io.aegis.gateway.loadbalancer.hash.HashKeyExtractor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.loadbalancer.DefaultResponse;
 import org.springframework.cloud.client.loadbalancer.EmptyResponse;
 import org.springframework.cloud.client.loadbalancer.Request;
 import org.springframework.cloud.client.loadbalancer.Response;
-import org.springframework.cloud.client.loadbalancer.reactive.ReactiveLoadBalancer;
+import org.springframework.cloud.loadbalancer.core.ReactorServiceInstanceLoadBalancer;
 import org.springframework.cloud.loadbalancer.core.RoundRobinLoadBalancer;
 import org.springframework.cloud.loadbalancer.core.ServiceInstanceListSupplier;
 import reactor.core.publisher.Mono;
@@ -21,7 +23,13 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * 按 serviceId 装配的一致性哈希 {@link ReactiveLoadBalancer}。
+ * 按 serviceId 装配的一致性哈希 {@link ReactorServiceInstanceLoadBalancer}。
+ * <p>
+ * 必须实现这个更具体的子接口而非上层的 {@code ReactiveLoadBalancer}——Spring Cloud Gateway 的
+ * {@code ReactiveLoadBalancerClientFilter} 是按
+ * {@code clientFactory.getInstance(serviceId, ReactorServiceInstanceLoadBalancer.class)} 取 Bean 的，
+ * 只实现上层接口会导致这个查找永远匹配不到本类，SCG 默认的 {@code RoundRobinLoadBalancer} 会被
+ * 静默保留使用，且没有任何报错（见 final-review C1）。
  * <p>
  * 内部持有一个 {@link RoundRobinLoadBalancer}（构造方式与 Spring Cloud LoadBalancer 自身
  * 创建默认实例完全一致）作为降级委托：serviceId 未配置一致性哈希 policy、或请求提取不到
@@ -37,7 +45,9 @@ import java.util.stream.Collectors;
  * Nacos 实例查询本身已经在 {@code NamespaceAwareNacosServiceInstanceListSupplier} 内部
  * 跑在 {@code boundedElastic} 上，这一层不需要额外调度。
  */
-public class ConsistentHashReactiveLoadBalancer implements ReactiveLoadBalancer<ServiceInstance> {
+public class ConsistentHashReactiveLoadBalancer implements ReactorServiceInstanceLoadBalancer {
+
+    private static final Logger log = LoggerFactory.getLogger(ConsistentHashReactiveLoadBalancer.class);
 
     private final ObjectProvider<ServiceInstanceListSupplier> supplierProvider;
     private final String serviceId;
@@ -77,8 +87,27 @@ public class ConsistentHashReactiveLoadBalancer implements ReactiveLoadBalancer<
     @Override
     @SuppressWarnings("unchecked")
     public Mono<Response<ServiceInstance>> choose(Request request) {
+        // fail-open 承诺覆盖整条链路，不只是预期到的 key 缺失/supplier 缺失两个分支——
+        // ringCache 的 loader（ConsistentHashRing.build）理论上可能因异常配置（如 I2 描述的
+        // 虚拟节点数过大）抛出异常，这里兜底降级为轮询，避免请求以 5xx 结束
+        return Mono.defer(() -> chooseInternal(request))
+                .onErrorResume(e -> {
+                    log.warn("Consistent hash routing failed, degraded to round-robin. serviceId={}", serviceId, e);
+                    return delegate.choose(request);
+                });
+    }
+
+    private Mono<Response<ServiceInstance>> chooseInternal(Request request) {
         LoadBalancePolicy policy = policyRepository.findByServiceId(serviceId).orElse(null);
         if (policy == null) {
+            return delegate.choose(request);
+        }
+        // key 提取完全不依赖实例列表，必须放在 supplier.get() 之前：否则 key 缺失这条降级路径
+        // 会先触发一次 supplier.get()（Nacos 查询），delegate.choose() 内部又会自己再查一次，
+        // 把配置错误场景（通常是高频路径）的 Nacos 查询量和 boundedElastic 占用直接翻倍
+        Optional<String> key = keyExtractor.extract(request, policy);
+        if (key.isEmpty()) {
+            missingLogger.warnIfDue(serviceId, policy);
             return delegate.choose(request);
         }
         ServiceInstanceListSupplier supplier = supplierProvider.getIfAvailable();
@@ -88,11 +117,6 @@ public class ConsistentHashReactiveLoadBalancer implements ReactiveLoadBalancer<
             return delegate.choose(request);
         }
         return supplier.get(request).next().flatMap(instances -> {
-            Optional<String> key = keyExtractor.extract(request, policy);
-            if (key.isEmpty()) {
-                missingLogger.warnIfDue(serviceId, policy);
-                return delegate.choose(request);
-            }
             String cacheKey = buildCacheKey(instances, policy);
             ConsistentHashRing ring = ringCache.get(cacheKey,
                     k -> ConsistentHashRing.build(instances, resolveVirtualNodes(policy)));

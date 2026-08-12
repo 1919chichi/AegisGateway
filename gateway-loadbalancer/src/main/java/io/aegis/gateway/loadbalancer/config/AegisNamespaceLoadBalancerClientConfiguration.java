@@ -7,8 +7,8 @@ import io.aegis.gateway.loadbalancer.loadbalance.ConsistentHashReactiveLoadBalan
 import io.aegis.gateway.loadbalancer.loadbalance.LoadBalancePolicyRepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.cloud.client.ServiceInstance;
-import org.springframework.cloud.client.loadbalancer.reactive.ReactiveLoadBalancer;
+import org.springframework.cloud.loadbalancer.core.ReactorServiceInstanceLoadBalancer;
+import org.springframework.cloud.loadbalancer.core.RoundRobinLoadBalancer;
 import org.springframework.cloud.loadbalancer.core.ServiceInstanceListSupplier;
 import org.springframework.cloud.loadbalancer.support.LoadBalancerClientFactory;
 import org.springframework.context.annotation.Bean;
@@ -39,16 +39,29 @@ public class AegisNamespaceLoadBalancerClientConfiguration {
         return new NamespaceAwareNacosServiceInstanceListSupplier(serviceId, discoveryProperties, namingServiceRegistry);
     }
 
+    // 隐式条件类型 = 方法返回类型 ReactorServiceInstanceLoadBalancer，与 SCG 自身默认 Bean
+    // （LoadBalancerClientConfiguration#reactorServiceInstanceLoadBalancer，隐式类型
+    // ReactorLoadBalancer）互斥；本配置类先于 SCG 默认配置类注册（见
+    // NamedContextFactory#registerBeans 的 "default." 前缀分支），因此本 Bean 先注册，
+    // SCG 默认 Bean 的 @ConditionalOnMissingBean 检测到已存在后自动回退。
     @Bean
-    @ConditionalOnMissingBean(ReactiveLoadBalancer.class)
-    public ReactiveLoadBalancer<ServiceInstance> aegisConsistentHashLoadBalancer(
+    @ConditionalOnMissingBean
+    public ReactorServiceInstanceLoadBalancer aegisConsistentHashLoadBalancer(
             Environment environment,
             LoadBalancerClientFactory clientFactory,
-            LoadBalancePolicyRepository policyRepository) {
+            ObjectProvider<LoadBalancePolicyRepository> policyRepositoryProvider) {
         String serviceId = environment.getProperty(LoadBalancerClientFactory.PROPERTY_NAME);
         Assert.hasText(serviceId, "'serviceId' must not be empty");
         ObjectProvider<ServiceInstanceListSupplier> supplierProvider =
                 clientFactory.getLazyProvider(serviceId, ServiceInstanceListSupplier.class);
+        LoadBalancePolicyRepository policyRepository = policyRepositoryProvider.getIfAvailable();
+        if (policyRepository == null) {
+            // LoadBalancePolicyRepository 声明为可缺失的 Bean（NacosConfigSyncService 不存在时不注册，
+            // 见 AegisLoadBalancerAutoConfiguration），此处必须优雅降级为标准轮询——否则把一个
+            // "必需依赖缺失"的场景变成 LB 子容器 NoSuchBeanDefinitionException 刷新失败，
+            // 导致该 serviceId 的所有请求 500
+            return new RoundRobinLoadBalancer(supplierProvider, serviceId);
+        }
         return new ConsistentHashReactiveLoadBalancer(supplierProvider, serviceId, policyRepository);
     }
 }

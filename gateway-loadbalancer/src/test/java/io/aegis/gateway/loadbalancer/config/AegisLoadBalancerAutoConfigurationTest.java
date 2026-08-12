@@ -12,9 +12,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.cloud.client.ServiceInstance;
-import org.springframework.cloud.client.loadbalancer.reactive.ReactiveLoadBalancer;
 import org.springframework.cloud.commons.util.InetUtils;
+import org.springframework.cloud.loadbalancer.core.ReactorServiceInstanceLoadBalancer;
+import org.springframework.cloud.loadbalancer.core.RoundRobinLoadBalancer;
 import org.springframework.cloud.loadbalancer.core.ServiceInstanceListSupplier;
 import org.springframework.cloud.loadbalancer.support.LoadBalancerClientFactory;
 import org.springframework.context.annotation.Bean;
@@ -112,12 +112,38 @@ class AegisLoadBalancerAutoConfigurationTest {
         when(clientFactory.getLazyProvider("order-service", ServiceInstanceListSupplier.class))
                 .thenReturn(supplierProvider);
         LoadBalancePolicyRepository policyRepository = mock(LoadBalancePolicyRepository.class);
+        ObjectProvider<LoadBalancePolicyRepository> policyRepositoryProvider = mock(ObjectProvider.class);
+        when(policyRepositoryProvider.getIfAvailable()).thenReturn(policyRepository);
         AegisNamespaceLoadBalancerClientConfiguration configuration =
                 new AegisNamespaceLoadBalancerClientConfiguration();
 
-        ReactiveLoadBalancer<ServiceInstance> loadBalancer = configuration.aegisConsistentHashLoadBalancer(
-                environment, clientFactory, policyRepository);
+        ReactorServiceInstanceLoadBalancer loadBalancer = configuration.aegisConsistentHashLoadBalancer(
+                environment, clientFactory, policyRepositoryProvider);
 
         assertThat(loadBalancer).isInstanceOf(ConsistentHashReactiveLoadBalancer.class);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void clientConfiguration_shouldFallBackToPlainRoundRobin_whenPolicyRepositoryProviderUnavailable() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.getPropertySources().addFirst(new MapPropertySource("loadbalancer-client", Map.of(
+                LoadBalancerClientFactory.PROPERTY_NAME, "order-service")));
+        LoadBalancerClientFactory clientFactory = mock(LoadBalancerClientFactory.class);
+        ObjectProvider<ServiceInstanceListSupplier> supplierProvider = mock(ObjectProvider.class);
+        when(clientFactory.getLazyProvider("order-service", ServiceInstanceListSupplier.class))
+                .thenReturn(supplierProvider);
+        // LoadBalancePolicyRepository 声明为可缺失的 Bean（NacosConfigSyncService 不存在时不注册），
+        // 消费方必须能优雅降级，而不是让 LB 子容器因 NoSuchBeanDefinitionException 刷新失败
+        ObjectProvider<LoadBalancePolicyRepository> policyRepositoryProvider = mock(ObjectProvider.class);
+        when(policyRepositoryProvider.getIfAvailable()).thenReturn(null);
+        AegisNamespaceLoadBalancerClientConfiguration configuration =
+                new AegisNamespaceLoadBalancerClientConfiguration();
+
+        ReactorServiceInstanceLoadBalancer loadBalancer = configuration.aegisConsistentHashLoadBalancer(
+                environment, clientFactory, policyRepositoryProvider);
+
+        assertThat(loadBalancer).isInstanceOf(RoundRobinLoadBalancer.class);
+        assertThat(loadBalancer).isNotInstanceOf(ConsistentHashReactiveLoadBalancer.class);
     }
 }
