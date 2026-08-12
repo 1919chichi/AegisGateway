@@ -3,11 +3,17 @@ package io.aegis.gateway.loadbalancer.config;
 import com.alibaba.cloud.nacos.NacosDiscoveryProperties;
 import com.alibaba.cloud.nacos.NacosServiceManager;
 import com.alibaba.cloud.nacos.util.InetIPv6Utils;
+import io.aegis.gateway.core.nacos.NacosConfigSyncService;
 import io.aegis.gateway.loadbalancer.discovery.NamespaceAwareNacosServiceInstanceListSupplier;
 import io.aegis.gateway.loadbalancer.discovery.NacosNamingServiceRegistry;
+import io.aegis.gateway.loadbalancer.loadbalance.ConsistentHashReactiveLoadBalancer;
+import io.aegis.gateway.loadbalancer.loadbalance.LoadBalancePolicyRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.cloud.client.ServiceInstance;
+import org.springframework.cloud.client.loadbalancer.reactive.ReactiveLoadBalancer;
 import org.springframework.cloud.commons.util.InetUtils;
 import org.springframework.cloud.loadbalancer.core.ServiceInstanceListSupplier;
 import org.springframework.cloud.loadbalancer.support.LoadBalancerClientFactory;
@@ -15,6 +21,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.mock.env.MockEnvironment;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 
@@ -77,5 +84,40 @@ class AegisLoadBalancerAutoConfigurationTest {
 
         assertThat(supplier).isInstanceOf(NamespaceAwareNacosServiceInstanceListSupplier.class);
         assertThat(supplier.getServiceId()).isEqualTo("user-service");
+    }
+
+    @Test
+    void autoConfiguration_shouldRegisterLoadBalancePolicyRepository_whenNacosConfigSyncServiceBeanPresent() {
+        contextRunner
+                .withBean(NacosConfigSyncService.class, () -> mock(NacosConfigSyncService.class))
+                .withBean(ObjectMapper.class, ObjectMapper::new)
+                .run(context -> assertThat(context).hasSingleBean(LoadBalancePolicyRepository.class));
+    }
+
+    @Test
+    void autoConfiguration_shouldNotRegisterLoadBalancePolicyRepository_whenNacosConfigSyncServiceBeanMissing() {
+        contextRunner
+                .withBean(ObjectMapper.class, ObjectMapper::new)
+                .run(context -> assertThat(context).doesNotHaveBean(LoadBalancePolicyRepository.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void clientConfiguration_shouldCreateConsistentHashLoadBalancerBean() {
+        MockEnvironment environment = new MockEnvironment();
+        environment.getPropertySources().addFirst(new MapPropertySource("loadbalancer-client", Map.of(
+                LoadBalancerClientFactory.PROPERTY_NAME, "order-service")));
+        LoadBalancerClientFactory clientFactory = mock(LoadBalancerClientFactory.class);
+        ObjectProvider<ServiceInstanceListSupplier> supplierProvider = mock(ObjectProvider.class);
+        when(clientFactory.getLazyProvider("order-service", ServiceInstanceListSupplier.class))
+                .thenReturn(supplierProvider);
+        LoadBalancePolicyRepository policyRepository = mock(LoadBalancePolicyRepository.class);
+        AegisNamespaceLoadBalancerClientConfiguration configuration =
+                new AegisNamespaceLoadBalancerClientConfiguration();
+
+        ReactiveLoadBalancer<ServiceInstance> loadBalancer = configuration.aegisConsistentHashLoadBalancer(
+                environment, clientFactory, policyRepository);
+
+        assertThat(loadBalancer).isInstanceOf(ConsistentHashReactiveLoadBalancer.class);
     }
 }
