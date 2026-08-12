@@ -99,7 +99,7 @@ docs/rules/architecture-overview.md                          [改] gateway-loadb
 **Interfaces:**
 - Produces: `static int MurmurHash3.hash(byte[] data, int seed)`（包内可见，供 Task 2 的 `ConsistentHashRing` 使用）
 
-- [x] **Step 1: 写失败测试**
+- [x] **Task 1 Step 1: 写失败测试**
 
 创建 `gateway-loadbalancer/src/test/java/io/aegis/gateway/loadbalancer/hash/MurmurHash3Test.java`：
 
@@ -159,12 +159,12 @@ class MurmurHash3Test {
 }
 ```
 
-- [x] **Step 2: 运行测试确认失败**
+- [x] **Task 1 Step 2: 运行测试确认失败**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.hash.MurmurHash3Test"`
 Expected: 编译失败（`MurmurHash3` 类不存在）
 
-- [x] **Step 3: 实现 MurmurHash3**
+- [x] **Task 1 Step 3: 实现 MurmurHash3**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/MurmurHash3.java`：
 
@@ -242,12 +242,12 @@ final class MurmurHash3 {
 }
 ```
 
-- [x] **Step 4: 运行测试确认通过**
+- [x] **Task 1 Step 4: 运行测试确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.hash.MurmurHash3Test"`
 Expected: PASS（7 个测试全部通过）
 
-- [x] **Step 5: Commit**
+- [x] **Task 1 Step 5: Commit**
 
 ```bash
 git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/MurmurHash3.java \
@@ -270,7 +270,7 @@ git commit -m "feat(loadbalancer): add hand-written MurmurHash3 x86_32 implement
   - `public Optional<ServiceInstance> route(String key)`
   - `public static double resolveWeight(ServiceInstance instance)`（Task 7 的 `ConsistentHashReactiveLoadBalancer.buildCacheKey` 会复用这个方法，避免在两处重复解析 `"nacos.weight"` metadata）
 
-- [ ] **Step 1: 写失败测试（虚拟节点数按权重比例分配 + 相同 key 稳定路由 + 空实例列表）**
+- [ ] **Task 2 Step 1: 写失败测试（虚拟节点数按权重比例分配 + 相同 key 稳定路由 + 空实例列表）**
 
 创建 `gateway-loadbalancer/src/test/java/io/aegis/gateway/loadbalancer/hash/ConsistentHashRingTest.java`：
 
@@ -375,12 +375,12 @@ class ConsistentHashRingTest {
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [ ] **Task 2 Step 2: 运行测试确认失败**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.hash.ConsistentHashRingTest"`
 Expected: 编译失败（`ConsistentHashRing` 类不存在）
 
-- [ ] **Step 3: 实现 ConsistentHashRing**
+- [ ] **Task 2 Step 3: 实现 ConsistentHashRing**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/ConsistentHashRing.java`：
 
@@ -490,12 +490,12 @@ public final class ConsistentHashRing {
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [ ] **Task 2 Step 4: 运行测试确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.hash.ConsistentHashRingTest"`
 Expected: PASS（4 个测试全部通过）
 
-- [ ] **Step 5: Commit**
+- [ ] **Task 2 Step 5: Commit**
 
 ```bash
 git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/ConsistentHashRing.java \
@@ -522,7 +522,7 @@ git commit -m "feat(loadbalancer): add ConsistentHashRing with weighted virtual 
 
 这些是纯数据模型（枚举 + record），没有可独立测试的行为分支（`LoadBalanceGovernanceConfig` 的 null-safety 由 Task 5 的 `LoadBalancePolicyRepositoryTest` 间接覆盖：反序列化含 `loadBalancePolicies` 字段的真实 JSON 本身就验证了 record 的构造行为）。本任务不写独立测试，直接实现 + 编译通过 + commit。
 
-- [ ] **Step 1: 创建 LoadBalanceStrategy 枚举**
+- [ ] **Task 3 Step 1: 创建 LoadBalanceStrategy 枚举**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/LoadBalanceStrategy.java`：
 
@@ -540,7 +540,7 @@ public enum LoadBalanceStrategy {
 }
 ```
 
-- [ ] **Step 2: 创建 HashKeySource 枚举**
+- [ ] **Task 3 Step 2: 创建 HashKeySource 枚举**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/HashKeySource.java`：
 
@@ -559,7 +559,7 @@ public enum HashKeySource {
 }
 ```
 
-- [ ] **Step 3: 创建 LoadBalancePolicy record**
+- [ ] **Task 3 Step 3: 创建 LoadBalancePolicy record**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/LoadBalancePolicy.java`：
 
@@ -596,7 +596,7 @@ public record LoadBalancePolicy(
 }
 ```
 
-- [ ] **Step 4: 创建 LoadBalanceGovernanceConfig record**
+- [ ] **Task 3 Step 4: 创建 LoadBalanceGovernanceConfig record**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/LoadBalanceGovernanceConfig.java`：
 
@@ -620,12 +620,12 @@ public record LoadBalanceGovernanceConfig(List<LoadBalancePolicy> loadBalancePol
 }
 ```
 
-- [ ] **Step 5: 编译确认通过**
+- [ ] **Task 3 Step 5: 编译确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:compileJava`
 Expected: BUILD SUCCESSFUL
 
-- [ ] **Step 6: Commit**
+- [ ] **Task 3 Step 6: Commit**
 
 ```bash
 git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/LoadBalanceStrategy.java \
@@ -648,7 +648,7 @@ git commit -m "feat(loadbalancer): add load balance governance policy models"
 - Consumes: `LoadBalancePolicy`、`HashKeySource`（Task 3）
 - Produces: `public interface HashKeyExtractor { Optional<String> extract(Request<?> request, LoadBalancePolicy policy); }`，唯一实现 `public final class DefaultHashKeyExtractor implements HashKeyExtractor`（Task 7 的 `ConsistentHashReactiveLoadBalancer` 会 `new` 这个实现）
 
-- [ ] **Step 1: 写失败测试**
+- [ ] **Task 4 Step 1: 写失败测试**
 
 创建 `gateway-loadbalancer/src/test/java/io/aegis/gateway/loadbalancer/hash/DefaultHashKeyExtractorTest.java`：
 
@@ -731,12 +731,12 @@ class DefaultHashKeyExtractorTest {
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [ ] **Task 4 Step 2: 运行测试确认失败**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.hash.DefaultHashKeyExtractorTest"`
 Expected: 编译失败（`HashKeyExtractor` / `DefaultHashKeyExtractor` 不存在）
 
-- [ ] **Step 3: 实现 HashKeyExtractor 接口**
+- [ ] **Task 4 Step 3: 实现 HashKeyExtractor 接口**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/HashKeyExtractor.java`：
 
@@ -759,7 +759,7 @@ public interface HashKeyExtractor {
 }
 ```
 
-- [ ] **Step 4: 实现 DefaultHashKeyExtractor**
+- [ ] **Task 4 Step 4: 实现 DefaultHashKeyExtractor**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/DefaultHashKeyExtractor.java`：
 
@@ -828,12 +828,12 @@ public final class DefaultHashKeyExtractor implements HashKeyExtractor {
 }
 ```
 
-- [ ] **Step 5: 运行测试确认通过**
+- [ ] **Task 4 Step 5: 运行测试确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.hash.DefaultHashKeyExtractorTest"`
 Expected: PASS（5 个测试全部通过）
 
-- [ ] **Step 6: Commit**
+- [ ] **Task 4 Step 6: Commit**
 
 ```bash
 git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/HashKeyExtractor.java \
@@ -855,7 +855,7 @@ git commit -m "feat(loadbalancer): add HashKeyExtractor for CLIENT_IP/HEADER key
 - Consumes: `NacosConfigSyncService.registerGovernanceListener(Consumer<String>)`（`gateway-core`）、`LoadBalanceGovernanceConfig`/`LoadBalancePolicy`/`HashKeySource`（Task 3）
 - Produces: `public LoadBalancePolicyRepository(NacosConfigSyncService syncService, ObjectMapper objectMapper)`、`public Optional<LoadBalancePolicy> findByServiceId(String serviceId)`（Task 7、Task 8 都要用）
 
-- [ ] **Step 1: 给 gateway-loadbalancer 显式声明 jackson-databind 依赖**
+- [ ] **Task 5 Step 1: 给 gateway-loadbalancer 显式声明 jackson-databind 依赖**
 
 修改 `gateway-loadbalancer/build.gradle`：
 
@@ -875,7 +875,7 @@ dependencies {
 }
 ```
 
-- [ ] **Step 2: 写失败测试**
+- [ ] **Task 5 Step 2: 写失败测试**
 
 创建 `gateway-loadbalancer/src/test/java/io/aegis/gateway/loadbalancer/loadbalance/LoadBalancePolicyRepositoryTest.java`：
 
@@ -1002,12 +1002,12 @@ class LoadBalancePolicyRepositoryTest {
 }
 ```
 
-- [ ] **Step 3: 运行测试确认失败**
+- [ ] **Task 5 Step 3: 运行测试确认失败**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.loadbalance.LoadBalancePolicyRepositoryTest"`
 Expected: 编译失败（`LoadBalancePolicyRepository` 不存在）
 
-- [ ] **Step 4: 实现 LoadBalancePolicyRepository**
+- [ ] **Task 5 Step 4: 实现 LoadBalancePolicyRepository**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/LoadBalancePolicyRepository.java`：
 
@@ -1100,12 +1100,12 @@ public class LoadBalancePolicyRepository {
 }
 ```
 
-- [ ] **Step 5: 运行测试确认通过**
+- [ ] **Task 5 Step 5: 运行测试确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.loadbalance.LoadBalancePolicyRepositoryTest"`
 Expected: PASS（6 个测试全部通过）
 
-- [ ] **Step 6: Commit**
+- [ ] **Task 5 Step 6: Commit**
 
 ```bash
 git add gateway-loadbalancer/build.gradle \
@@ -1128,7 +1128,7 @@ git commit -m "feat(loadbalancer): add LoadBalancePolicyRepository backed by Nac
 
 > 设计文档给的签名是 `void warnIfDue(...)`。这里改成 `boolean`（是否实际打印了日志）纯粹是为了可测试性，镜像 `RedissonClientManager.retryLater()` "返回 boolean 便于测试验证冷却语义"的既有写法（见 `gateway-ratelimit/src/main/java/io/aegis/gateway/ratelimit/core/RedissonClientManager.java:78-80`）。调用方完全不需要感知这个返回值，行为不变。
 
-- [ ] **Step 1: 写失败测试**
+- [ ] **Task 6 Step 1: 写失败测试**
 
 创建 `gateway-loadbalancer/src/test/java/io/aegis/gateway/loadbalancer/loadbalance/HashKeyMissingLoggerTest.java`：
 
@@ -1188,12 +1188,12 @@ class HashKeyMissingLoggerTest {
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [ ] **Task 6 Step 2: 运行测试确认失败**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.loadbalance.HashKeyMissingLoggerTest"`
 Expected: 编译失败（`HashKeyMissingLogger` 不存在）
 
-- [ ] **Step 3: 实现 HashKeyMissingLogger**
+- [ ] **Task 6 Step 3: 实现 HashKeyMissingLogger**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/HashKeyMissingLogger.java`：
 
@@ -1257,12 +1257,12 @@ final class HashKeyMissingLogger {
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [ ] **Task 6 Step 4: 运行测试确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.loadbalance.HashKeyMissingLoggerTest"`
 Expected: PASS（4 个测试全部通过）
 
-- [ ] **Step 5: Commit**
+- [ ] **Task 6 Step 5: Commit**
 
 ```bash
 git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/HashKeyMissingLogger.java \
@@ -1282,7 +1282,7 @@ git commit -m "feat(loadbalancer): add throttled WARN logging for missing hash k
 - Consumes: `ConsistentHashRing`/`ConsistentHashRing.resolveWeight()`（Task 2）、`HashKeyExtractor`/`DefaultHashKeyExtractor`（Task 4）、`LoadBalancePolicyRepository`（Task 5）、`HashKeyMissingLogger`（Task 6）
 - Produces: `public ConsistentHashReactiveLoadBalancer(ObjectProvider<ServiceInstanceListSupplier> supplierProvider, String serviceId, LoadBalancePolicyRepository policyRepository)`，实现 `ReactiveLoadBalancer<ServiceInstance>`（Task 8 的 Bean 装配会 `new` 这个类）
 
-- [ ] **Step 1: 写失败测试（无 policy → 委托轮询；policy+key → 稳定路由）**
+- [ ] **Task 7 Step 1: 写失败测试（无 policy → 委托轮询；policy+key → 稳定路由）**
 
 创建 `gateway-loadbalancer/src/test/java/io/aegis/gateway/loadbalancer/loadbalance/ConsistentHashReactiveLoadBalancerTest.java`（先写前两个场景）：
 
@@ -1502,12 +1502,12 @@ class ConsistentHashReactiveLoadBalancerTest {
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [ ] **Task 7 Step 2: 运行测试确认失败**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.loadbalance.ConsistentHashReactiveLoadBalancerTest"`
 Expected: 编译失败（`ConsistentHashReactiveLoadBalancer` 不存在，且缺少测试构造器）
 
-- [ ] **Step 3: 实现 ConsistentHashReactiveLoadBalancer**
+- [ ] **Task 7 Step 3: 实现 ConsistentHashReactiveLoadBalancer**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/ConsistentHashReactiveLoadBalancer.java`：
 
@@ -1634,12 +1634,12 @@ public class ConsistentHashReactiveLoadBalancer implements ReactiveLoadBalancer<
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [ ] **Task 7 Step 4: 运行测试确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.loadbalance.ConsistentHashReactiveLoadBalancerTest"`
 Expected: PASS（7 个测试全部通过）
 
-- [ ] **Step 5: Commit**
+- [ ] **Task 7 Step 5: Commit**
 
 ```bash
 git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/ConsistentHashReactiveLoadBalancer.java \
@@ -1660,7 +1660,7 @@ git commit -m "feat(loadbalancer): add ConsistentHashReactiveLoadBalancer"
 - Consumes: `LoadBalancePolicyRepository`（Task 5）、`ConsistentHashReactiveLoadBalancer`（Task 7）、`NacosConfigSyncService`（`gateway-core`）
 - Produces: `AegisLoadBalancerAutoConfiguration` 注册全局唯一的 `LoadBalancePolicyRepository` bean；`AegisNamespaceLoadBalancerClientConfiguration` 为每个 serviceId 注册 `ConsistentHashReactiveLoadBalancer` 作为 `ReactiveLoadBalancer<ServiceInstance>`
 
-- [ ] **Step 1: 写失败测试**
+- [ ] **Task 8 Step 1: 写失败测试**
 
 在现有 `gateway-loadbalancer/src/test/java/io/aegis/gateway/loadbalancer/config/AegisLoadBalancerAutoConfigurationTest.java` 中追加以下内容（保留原有类和测试方法不动）：
 
@@ -1718,12 +1718,12 @@ import tools.jackson.databind.ObjectMapper;
     }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [ ] **Task 8 Step 2: 运行测试确认失败**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.config.AegisLoadBalancerAutoConfigurationTest"`
 Expected: 编译失败（`LoadBalancePolicyRepository` bean 方法、`aegisConsistentHashLoadBalancer` 方法均不存在）
 
-- [ ] **Step 3: 修改 AegisLoadBalancerAutoConfiguration**
+- [ ] **Task 8 Step 3: 修改 AegisLoadBalancerAutoConfiguration**
 
 将 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/config/AegisLoadBalancerAutoConfiguration.java` 整体替换为：
 
@@ -1786,7 +1786,7 @@ public class AegisLoadBalancerAutoConfiguration {
 }
 ```
 
-- [ ] **Step 4: 修改 AegisNamespaceLoadBalancerClientConfiguration**
+- [ ] **Task 8 Step 4: 修改 AegisNamespaceLoadBalancerClientConfiguration**
 
 将 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/config/AegisNamespaceLoadBalancerClientConfiguration.java` 整体替换为：
 
@@ -1847,17 +1847,17 @@ public class AegisNamespaceLoadBalancerClientConfiguration {
 }
 ```
 
-- [ ] **Step 5: 运行测试确认通过**
+- [ ] **Task 8 Step 5: 运行测试确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.config.AegisLoadBalancerAutoConfigurationTest"`
 Expected: PASS（全部测试通过，含原有 2 个 + 新增 3 个）
 
-- [ ] **Step 6: 运行整个模块测试确认无回归**
+- [ ] **Task 8 Step 6: 运行整个模块测试确认无回归**
 
 Run: `./gradlew :gateway-loadbalancer:test`
 Expected: BUILD SUCCESSFUL，全部测试通过
 
-- [ ] **Step 7: Commit**
+- [ ] **Task 8 Step 7: Commit**
 
 ```bash
 git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/config/AegisLoadBalancerAutoConfiguration.java \
@@ -1877,7 +1877,7 @@ git commit -m "feat(loadbalancer): wire ConsistentHashReactiveLoadBalancer into 
 **Interfaces:**
 - 无代码接口，纯文档任务
 
-- [ ] **Step 1: 更新 gateway-loadbalancer/CLAUDE.md**
+- [ ] **Task 9 Step 1: 更新 gateway-loadbalancer/CLAUDE.md**
 
 在 `gateway-loadbalancer/CLAUDE.md` 的"关键类"表格后、"命名空间感知发现机制"章节前，插入一个新的二级章节（保留文件其余内容不变）：
 
@@ -1921,7 +1921,7 @@ git commit -m "feat(loadbalancer): wire ConsistentHashReactiveLoadBalancer into 
 `AegisFilterOrder.LOAD_BALANCER = 10100` 仍然是预留但从未使用的顺序常量——一致性哈希是通过标准 `ReactiveLoadBalancer` 扩展点接入的（与命名空间感知 Supplier 同一挂载方式），不依赖这个 Filter 顺序常量，本次改动也没有采用它。
 ```
 
-- [ ] **Step 2: 更新 docs/rules/architecture-overview.md**
+- [ ] **Task 9 Step 2: 更新 docs/rules/architecture-overview.md**
 
 在 `docs/rules/architecture-overview.md` 的模块职责表格中，把：
 
@@ -1935,7 +1935,7 @@ git commit -m "feat(loadbalancer): wire ConsistentHashReactiveLoadBalancer into 
 | `gateway-loadbalancer` | 基于 Nacos + Spring Cloud LoadBalancer 的服务发现负载均衡；支持按服务粒度可选启用一致性哈希策略（会话保持） |
 ```
 
-- [ ] **Step 3: Commit**
+- [ ] **Task 9 Step 3: Commit**
 
 ```bash
 git add gateway-loadbalancer/CLAUDE.md docs/rules/architecture-overview.md
