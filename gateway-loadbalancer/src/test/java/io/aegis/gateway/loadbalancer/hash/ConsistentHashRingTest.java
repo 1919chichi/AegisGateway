@@ -47,6 +47,37 @@ class ConsistentHashRingTest {
     }
 
     @Test
+    void resolveWeight_shouldFallbackTo1_0_whenWeightMetadataIsInvalid() {
+        // 非法数字字符串
+        ServiceInstance malformedWeight = instance("10.0.0.1", 8080, "abc");
+        // 空白字符串
+        ServiceInstance blankWeight = instance("10.0.0.2", 8080, "");
+
+        ConsistentHashRing ring = ConsistentHashRing.build(
+                List.of(malformedWeight, blankWeight), 10);
+
+        // 两个实例都按缺省权重 1.0 处理：10 * 1.0 = 10 虚拟节点
+        assertThat(ring.virtualNodeCountFor(malformedWeight)).isEqualTo(10);
+        assertThat(ring.virtualNodeCountFor(blankWeight)).isEqualTo(10);
+        assertThat(ring.virtualNodeCount()).isEqualTo(20);
+    }
+
+    @Test
+    void build_shouldReturnEmptyRing_whenAllInstancesHaveZeroWeight() {
+        // 所有实例权重都是 0
+        ServiceInstance zeroWeightA = instance("10.0.0.1", 8080, "0");
+        ServiceInstance zeroWeightB = instance("10.0.0.2", 8080, "0.0");
+
+        ConsistentHashRing ring = ConsistentHashRing.build(
+                List.of(zeroWeightA, zeroWeightB), 160);
+
+        // 权重为 0 的实例不分配虚拟节点，环为空
+        assertThat(ring.virtualNodeCount()).isEqualTo(0);
+        // 空环返回空
+        assertThat(ring.route("any-key")).isEmpty();
+    }
+
+    @Test
     void route_shouldOnlyRemapKeysThatOriginallyHitRemovedInstance() {
         // 场景已用参考实现模拟过：5 实例、160 虚拟节点/权重、10000 个 key、移除下标 2（10.0.0.3），
         // 实测变化比例 20.04%，落在 [0.15, 0.30] 区间内，且 0 例违反"变化的 key 必然原属于被移除实例"。
