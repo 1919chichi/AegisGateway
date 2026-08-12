@@ -855,7 +855,7 @@ git commit -m "feat(loadbalancer): add HashKeyExtractor for CLIENT_IP/HEADER key
 - Consumes: `NacosConfigSyncService.registerGovernanceListener(Consumer<String>)`（`gateway-core`）、`LoadBalanceGovernanceConfig`/`LoadBalancePolicy`/`HashKeySource`（Task 3）
 - Produces: `public LoadBalancePolicyRepository(NacosConfigSyncService syncService, ObjectMapper objectMapper)`、`public Optional<LoadBalancePolicy> findByServiceId(String serviceId)`（Task 7、Task 8 都要用）
 
-- [ ] **Task 5 Step 1: 给 gateway-loadbalancer 显式声明 jackson-databind 依赖**
+- [x] **Task 5 Step 1: 给 gateway-loadbalancer 显式声明 jackson-databind 依赖**
 
 修改 `gateway-loadbalancer/build.gradle`：
 
@@ -875,7 +875,7 @@ dependencies {
 }
 ```
 
-- [ ] **Task 5 Step 2: 写失败测试**
+- [x] **Task 5 Step 2: 写失败测试**
 
 创建 `gateway-loadbalancer/src/test/java/io/aegis/gateway/loadbalancer/loadbalance/LoadBalancePolicyRepositoryTest.java`：
 
@@ -1002,12 +1002,12 @@ class LoadBalancePolicyRepositoryTest {
 }
 ```
 
-- [ ] **Task 5 Step 3: 运行测试确认失败**
+- [x] **Task 5 Step 3: 运行测试确认失败**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.loadbalance.LoadBalancePolicyRepositoryTest"`
 Expected: 编译失败（`LoadBalancePolicyRepository` 不存在）
 
-- [ ] **Task 5 Step 4: 实现 LoadBalancePolicyRepository**
+- [x] **Task 5 Step 4: 实现 LoadBalancePolicyRepository**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/LoadBalancePolicyRepository.java`：
 
@@ -1100,12 +1100,12 @@ public class LoadBalancePolicyRepository {
 }
 ```
 
-- [ ] **Task 5 Step 5: 运行测试确认通过**
+- [x] **Task 5 Step 5: 运行测试确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.loadbalance.LoadBalancePolicyRepositoryTest"`
 Expected: PASS（6 个测试全部通过）
 
-- [ ] **Task 5 Step 6: Commit**
+- [x] **Task 5 Step 6: Commit**
 
 ```bash
 git add gateway-loadbalancer/build.gradle \
