@@ -648,7 +648,7 @@ git commit -m "feat(loadbalancer): add load balance governance policy models"
 - Consumes: `LoadBalancePolicy`、`HashKeySource`（Task 3）
 - Produces: `public interface HashKeyExtractor { Optional<String> extract(Request<?> request, LoadBalancePolicy policy); }`，唯一实现 `public final class DefaultHashKeyExtractor implements HashKeyExtractor`（Task 7 的 `ConsistentHashReactiveLoadBalancer` 会 `new` 这个实现）
 
-- [ ] **Task 4 Step 1: 写失败测试**
+- [x] **Task 4 Step 1: 写失败测试**
 
 创建 `gateway-loadbalancer/src/test/java/io/aegis/gateway/loadbalancer/hash/DefaultHashKeyExtractorTest.java`：
 
@@ -731,12 +731,12 @@ class DefaultHashKeyExtractorTest {
 }
 ```
 
-- [ ] **Task 4 Step 2: 运行测试确认失败**
+- [x] **Task 4 Step 2: 运行测试确认失败**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.hash.DefaultHashKeyExtractorTest"`
 Expected: 编译失败（`HashKeyExtractor` / `DefaultHashKeyExtractor` 不存在）
 
-- [ ] **Task 4 Step 3: 实现 HashKeyExtractor 接口**
+- [x] **Task 4 Step 3: 实现 HashKeyExtractor 接口**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/HashKeyExtractor.java`：
 
@@ -759,7 +759,7 @@ public interface HashKeyExtractor {
 }
 ```
 
-- [ ] **Task 4 Step 4: 实现 DefaultHashKeyExtractor**
+- [x] **Task 4 Step 4: 实现 DefaultHashKeyExtractor**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/DefaultHashKeyExtractor.java`：
 
@@ -828,12 +828,12 @@ public final class DefaultHashKeyExtractor implements HashKeyExtractor {
 }
 ```
 
-- [ ] **Task 4 Step 5: 运行测试确认通过**
+- [x] **Task 4 Step 5: 运行测试确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.hash.DefaultHashKeyExtractorTest"`
 Expected: PASS（5 个测试全部通过）
 
-- [ ] **Task 4 Step 6: Commit**
+- [x] **Task 4 Step 6: Commit**
 
 ```bash
 git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/HashKeyExtractor.java \
