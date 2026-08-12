@@ -5,4 +5,9 @@ dependencies {
     implementation 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
     implementation 'com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery'
     implementation 'com.github.ben-manes.caffeine:caffeine'
+    // LoadBalancePolicyRepository 需要反序列化 governance JSON，此前该模块从未直接用过
+    // Jackson，只是通过其他依赖链偶然传递到 compile classpath；显式声明避免依赖这种偶然关系
+    // （镜像 gateway-ratelimit/build.gradle 的做法）。注意包名是 tools.jackson.*
+    // （Spring Boot 4 的 Jackson 3），不是 com.fasterxml.jackson。
+    implementation 'tools.jackson.core:jackson-databind'
 }

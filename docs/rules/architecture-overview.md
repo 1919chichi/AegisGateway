@@ -10,7 +10,7 @@ AegisGateway 是基于 Spring Cloud Gateway（WebFlux）的响应式 API 网关�
 | `gateway-server` | Boot 应用入口，依赖所有其他模块 |
 | `gateway-ratelimit` | 基于 Redisson（Redis）的分布式限流 |
 | `gateway-circuitbreaker` | 基于 Resilience4j 的熔断 |
-| `gateway-loadbalancer` | 基于 Nacos + Spring Cloud LoadBalancer 的服务发现负载均衡 |
+| `gateway-loadbalancer` | 基于 Nacos + Spring Cloud LoadBalancer 的服务发现负载均衡；支持按服务粒度可选启用一致性哈希策略（会话保持） |
 | `gateway-gray` | 灰度/金丝雀路由 |
 | `gateway-auth` | JWT 认证 |
 | `gateway-transform` | 请求/响应转换 |
