@@ -1128,7 +1128,7 @@ git commit -m "feat(loadbalancer): add LoadBalancePolicyRepository backed by Nac
 
 > 设计文档给的签名是 `void warnIfDue(...)`。这里改成 `boolean`（是否实际打印了日志）纯粹是为了可测试性，镜像 `RedissonClientManager.retryLater()` "返回 boolean 便于测试验证冷却语义"的既有写法（见 `gateway-ratelimit/src/main/java/io/aegis/gateway/ratelimit/core/RedissonClientManager.java:78-80`）。调用方完全不需要感知这个返回值，行为不变。
 
-- [ ] **Task 6 Step 1: 写失败测试**
+- [x] **Task 6 Step 1: 写失败测试**
 
 创建 `gateway-loadbalancer/src/test/java/io/aegis/gateway/loadbalancer/loadbalance/HashKeyMissingLoggerTest.java`：
 
@@ -1188,12 +1188,12 @@ class HashKeyMissingLoggerTest {
 }
 ```
 
-- [ ] **Task 6 Step 2: 运行测试确认失败**
+- [x] **Task 6 Step 2: 运行测试确认失败**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.loadbalance.HashKeyMissingLoggerTest"`
 Expected: 编译失败（`HashKeyMissingLogger` 不存在）
 
-- [ ] **Task 6 Step 3: 实现 HashKeyMissingLogger**
+- [x] **Task 6 Step 3: 实现 HashKeyMissingLogger**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/HashKeyMissingLogger.java`：
 
@@ -1257,12 +1257,12 @@ final class HashKeyMissingLogger {
 }
 ```
 
-- [ ] **Task 6 Step 4: 运行测试确认通过**
+- [x] **Task 6 Step 4: 运行测试确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.loadbalance.HashKeyMissingLoggerTest"`
 Expected: PASS（4 个测试全部通过）
 
-- [ ] **Task 6 Step 5: Commit**
+- [x] **Task 6 Step 5: Commit**
 
 ```bash
 git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/HashKeyMissingLogger.java \
