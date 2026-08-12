@@ -1946,9 +1946,9 @@ git commit -m "docs(loadbalancer): document consistent hash load balancing capab
 
 ## 自动化任务完成后的整体验证
 
-- [ ] Run: `./gradlew :gateway-loadbalancer:test`
+- [x] Run: `./gradlew :gateway-loadbalancer:test`
       Expected: BUILD SUCCESSFUL，全部测试通过（Task 1~8 新增的全部测试类 + 原有测试类）
-- [ ] Run: `./gradlew :gateway-server:bootJar`
+- [x] Run: `./gradlew :gateway-server:bootJar`
       Expected: BUILD SUCCESSFUL（确认新增代码不破坏整体编译，`gateway-server` 依赖 `gateway-loadbalancer`）
 
 ---
