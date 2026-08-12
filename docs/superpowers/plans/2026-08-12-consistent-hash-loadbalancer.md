@@ -522,7 +522,7 @@ git commit -m "feat(loadbalancer): add ConsistentHashRing with weighted virtual 
 
 这些是纯数据模型（枚举 + record），没有可独立测试的行为分支（`LoadBalanceGovernanceConfig` 的 null-safety 由 Task 5 的 `LoadBalancePolicyRepositoryTest` 间接覆盖：反序列化含 `loadBalancePolicies` 字段的真实 JSON 本身就验证了 record 的构造行为）。本任务不写独立测试，直接实现 + 编译通过 + commit。
 
-- [ ] **Task 3 Step 1: 创建 LoadBalanceStrategy 枚举**
+- [x] **Task 3 Step 1: 创建 LoadBalanceStrategy 枚举**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/LoadBalanceStrategy.java`：
 
@@ -540,7 +540,7 @@ public enum LoadBalanceStrategy {
 }
 ```
 
-- [ ] **Task 3 Step 2: 创建 HashKeySource 枚举**
+- [x] **Task 3 Step 2: 创建 HashKeySource 枚举**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/HashKeySource.java`：
 
@@ -559,7 +559,7 @@ public enum HashKeySource {
 }
 ```
 
-- [ ] **Task 3 Step 3: 创建 LoadBalancePolicy record**
+- [x] **Task 3 Step 3: 创建 LoadBalancePolicy record**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/LoadBalancePolicy.java`：
 
@@ -596,7 +596,7 @@ public record LoadBalancePolicy(
 }
 ```
 
-- [ ] **Task 3 Step 4: 创建 LoadBalanceGovernanceConfig record**
+- [x] **Task 3 Step 4: 创建 LoadBalanceGovernanceConfig record**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/LoadBalanceGovernanceConfig.java`：
 
@@ -620,12 +620,12 @@ public record LoadBalanceGovernanceConfig(List<LoadBalancePolicy> loadBalancePol
 }
 ```
 
-- [ ] **Task 3 Step 5: 编译确认通过**
+- [x] **Task 3 Step 5: 编译确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:compileJava`
 Expected: BUILD SUCCESSFUL
 
-- [ ] **Task 3 Step 6: Commit**
+- [x] **Task 3 Step 6: Commit**
 
 ```bash
 git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/LoadBalanceStrategy.java \
