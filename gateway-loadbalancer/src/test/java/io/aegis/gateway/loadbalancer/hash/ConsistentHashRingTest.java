@@ -1,5 +1,6 @@
 package io.aegis.gateway.loadbalancer.hash;
 
+import io.aegis.gateway.loadbalancer.loadbalance.LoadBalancePolicy;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.client.DefaultServiceInstance;
 import org.springframework.cloud.client.ServiceInstance;
@@ -11,6 +12,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ConsistentHashRingTest {
 
@@ -28,12 +30,12 @@ class ConsistentHashRingTest {
     }
 
     @Test
-    void route_shouldReturnSameInstance_forSameKey_acrossMultipleCalls() {
+    void route_shouldReturnSameIdentity_forSameKey_acrossMultipleCalls() {
         ConsistentHashRing ring = ConsistentHashRing.build(
                 List.of(instance("10.0.0.1", 8080, null), instance("10.0.0.2", 8080, null)), 160);
 
-        Optional<ServiceInstance> first = ring.route("user-42");
-        Optional<ServiceInstance> second = ring.route("user-42");
+        Optional<String> first = ring.route("user-42");
+        Optional<String> second = ring.route("user-42");
 
         assertThat(first).isPresent();
         assertThat(second).isEqualTo(first);
@@ -60,6 +62,29 @@ class ConsistentHashRingTest {
         assertThat(ring.virtualNodeCountFor(malformedWeight)).isEqualTo(10);
         assertThat(ring.virtualNodeCountFor(blankWeight)).isEqualTo(10);
         assertThat(ring.virtualNodeCount()).isEqualTo(20);
+    }
+
+    @Test
+    void build_shouldThrow_whenComputedVirtualNodesExceedMax() {
+        // weight 不受 LoadBalancePolicyRepository 的 virtualNodesPerWeight 校验约束
+        // （来自 Nacos 实例 metadata），极端权重仍能把乘积重新推高，build() 必须在
+        // 乘积算出来之后做最终兜底
+        ServiceInstance extremeWeight = instance("10.0.0.1", 8080, "1000000");
+
+        assertThatThrownBy(() -> ConsistentHashRing.build(
+                List.of(extremeWeight), LoadBalancePolicy.DEFAULT_VIRTUAL_NODES_PER_WEIGHT))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void resolveWeight_shouldFallbackTo1_0_whenWeightMetadataIsNonFiniteOrNegative() {
+        ServiceInstance nanWeight = instance("10.0.0.1", 8080, "NaN");
+        ServiceInstance infiniteWeight = instance("10.0.0.2", 8080, "Infinity");
+        ServiceInstance negativeWeight = instance("10.0.0.3", 8080, "-1.0");
+
+        assertThat(ConsistentHashRing.resolveWeight(nanWeight)).isEqualTo(1.0);
+        assertThat(ConsistentHashRing.resolveWeight(infiniteWeight)).isEqualTo(1.0);
+        assertThat(ConsistentHashRing.resolveWeight(negativeWeight)).isEqualTo(1.0);
     }
 
     @Test
@@ -95,20 +120,21 @@ class ConsistentHashRingTest {
         for (int i = 0; i < 10_000; i++) {
             keys.add("key-" + i);
         }
-        Map<String, ServiceInstance> initialMapping = new HashMap<>();
+        Map<String, String> initialMapping = new HashMap<>();
         for (String key : keys) {
             initialMapping.put(key, initialRing.route(key).orElseThrow());
         }
 
         ServiceInstance removed = initialInstances.get(2); // 10.0.0.3
+        String removedIdentity = ConsistentHashRing.identity(removed);
         List<ServiceInstance> remainingInstances = new ArrayList<>(initialInstances);
         remainingInstances.remove(removed);
         ConsistentHashRing rebuiltRing = ConsistentHashRing.build(remainingInstances, 160);
 
         int changed = 0;
         for (String key : keys) {
-            ServiceInstance before = initialMapping.get(key);
-            ServiceInstance after = rebuiltRing.route(key).orElseThrow();
+            String before = initialMapping.get(key);
+            String after = rebuiltRing.route(key).orElseThrow();
             if (before.equals(after)) {
                 // 未变化的 key：不需要额外断言。数学上，"变化 ⟹ 原目标是被移除实例" 与
                 // "原目标不是被移除实例 ⟹ 不变化" 互为逆否命题，下面的循环对所有 key 无遗漏地
@@ -116,7 +142,7 @@ class ConsistentHashRingTest {
                 continue;
             }
             changed++;
-            assertThat(before).isEqualTo(removed);
+            assertThat(before).isEqualTo(removedIdentity);
         }
         double changeRatio = changed / (double) keys.size();
         assertThat(changeRatio).isBetween(0.15, 0.30);

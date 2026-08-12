@@ -120,10 +120,21 @@ public class ConsistentHashReactiveLoadBalancer implements ReactorServiceInstanc
             String cacheKey = buildCacheKey(instances, policy);
             ConsistentHashRing ring = ringCache.get(cacheKey,
                     k -> ConsistentHashRing.build(instances, resolveVirtualNodes(policy)));
+            // ring 只存 identity（host:port），不持有 ServiceInstance 对象本身：环可能是上一次
+            // 请求缓存下来的，若直接用环里的旧对象，secure/metadata 等未参与 cache key 的字段
+            // 变化时会返回陈旧数据（如 namespace 切换、协议升级），必须按 identity 回到本次
+            // instances 里查找最新对象
             return Mono.just(ring.route(key.get())
+                    .flatMap(identity -> resolveInstance(instances, identity))
                     .<Response<ServiceInstance>>map(DefaultResponse::new)
                     .orElseGet(EmptyResponse::new));
         });
+    }
+
+    private static Optional<ServiceInstance> resolveInstance(List<ServiceInstance> instances, String identity) {
+        return instances.stream()
+                .filter(instance -> ConsistentHashRing.identity(instance).equals(identity))
+                .findFirst();
     }
 
     private static int resolveVirtualNodes(LoadBalancePolicy policy) {

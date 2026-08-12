@@ -72,8 +72,12 @@ public class LoadBalancePolicyRepository {
             if (policy.keySource() == HashKeySource.HEADER) {
                 requireText(policy.keyName(), "keyName must not be blank when keySource=HEADER: " + policy.serviceId());
             }
-            if (policy.virtualNodesPerWeight() != null && policy.virtualNodesPerWeight() <= 0) {
-                throw new IllegalArgumentException("virtualNodesPerWeight must be positive: " + policy.serviceId());
+            if (policy.virtualNodesPerWeight() != null
+                    && (policy.virtualNodesPerWeight() <= 0
+                        || policy.virtualNodesPerWeight() > LoadBalancePolicy.MAX_VIRTUAL_NODES_PER_WEIGHT)) {
+                throw new IllegalArgumentException(
+                        "virtualNodesPerWeight must be in (0, " + LoadBalancePolicy.MAX_VIRTUAL_NODES_PER_WEIGHT
+                                + "]: " + policy.serviceId());
             }
         }
     }

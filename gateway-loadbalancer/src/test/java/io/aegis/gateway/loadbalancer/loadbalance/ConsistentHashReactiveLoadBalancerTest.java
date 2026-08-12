@@ -182,6 +182,33 @@ class ConsistentHashReactiveLoadBalancerTest {
     }
 
     @Test
+    void choose_shouldReturnCurrentServiceInstance_notStaleCachedOne_whenNonKeyFieldsChange() {
+        LoadBalancePolicy policy = new LoadBalancePolicy(
+                SERVICE_ID, LoadBalanceStrategy.CONSISTENT_HASH, HashKeySource.HEADER, "X-User-Id", 160);
+        when(policyRepository.findByServiceId(SERVICE_ID)).thenReturn(Optional.of(policy));
+        // host:port:weight 完全相同（缓存 key 不变），但 secure 和 metadata 不同——
+        // 这两个字段不参与 cache key 计算，用来复现"缓存命中返回陈旧对象"的问题
+        ServiceInstance staleInstance = new DefaultServiceInstance(
+                "instance-10.0.0.1", SERVICE_ID, "10.0.0.1", 8080, false, Map.of());
+        ServiceInstance freshInstance = new DefaultServiceInstance(
+                "instance-10.0.0.1", SERVICE_ID, "10.0.0.1", 8080, true, Map.of("aegis.nacos.namespace", "gray"));
+        ServiceInstanceListSupplier supplier = mock(ServiceInstanceListSupplier.class);
+        when(supplierProvider.getIfAvailable()).thenReturn(supplier);
+        ConsistentHashReactiveLoadBalancer loadBalancer = newLoadBalancer(delegate, new HashKeyMissingLogger());
+        Request<RequestDataContext> request = requestWithHeader("X-User-Id", "u1");
+
+        when(supplier.get(any())).thenReturn(Flux.just(List.of(staleInstance)));
+        ServiceInstance first = choose(loadBalancer, request);
+
+        when(supplier.get(any())).thenReturn(Flux.just(List.of(freshInstance)));
+        ServiceInstance second = choose(loadBalancer, request);
+
+        assertThat(first).isEqualTo(staleInstance);
+        // 第二次请求必须拿到本次 supplier 返回的最新对象，而不是第一次缓存下来的旧对象
+        assertThat(second).isEqualTo(freshInstance);
+    }
+
+    @Test
     void choose_shouldOnlyRerouteKeysThatHitRemovedInstance_whenCandidateListShrinks() {
         LoadBalancePolicy policy = new LoadBalancePolicy(
                 SERVICE_ID, LoadBalanceStrategy.CONSISTENT_HASH, HashKeySource.HEADER, "X-User-Id", 160);

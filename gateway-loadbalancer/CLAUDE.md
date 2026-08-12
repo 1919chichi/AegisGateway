@@ -34,7 +34,7 @@
 ```
 
 - `keySource`：`CLIENT_IP`（读 `X-Forwarded-For` 请求头第一个值；当前依赖的 `spring-cloud-loadbalancer` 版本下 `RequestData` 不携带原始连接远端地址，只能走这个头，没有反向代理写入时会判定 key 缺失）或 `HEADER`（读 `keyName` 指定的请求头，此时 `keyName` 必填）。
-- `virtualNodesPerWeight`：缺省 160（`LoadBalancePolicy.DEFAULT_VIRTUAL_NODES_PER_WEIGHT`），每个实例的虚拟节点数 = 该值 × 实例权重（权重来自 `ServiceInstance.getMetadata().get("nacos.weight")`，缺失或非法时按 1.0 处理）。
+- `virtualNodesPerWeight`：缺省 160（`LoadBalancePolicy.DEFAULT_VIRTUAL_NODES_PER_WEIGHT`），必须在 `(0, LoadBalancePolicy.MAX_VIRTUAL_NODES_PER_WEIGHT]`（100,000）区间内，超出会被 `LoadBalancePolicyRepository` 拒绝并保留旧快照。每个实例的虚拟节点数 = 该值 × 实例权重（权重来自 `ServiceInstance.getMetadata().get("nacos.weight")`，缺失、非法、或不是有限非负数（NaN/Infinity/负数）时按 1.0 处理）；这个乘积本身也不能超过 100,000——weight 不受 policy 校验约束，`ConsistentHashRing.build()` 会在乘积算出来之后再兜底一次，超限直接抛异常，由 `ConsistentHashReactiveLoadBalancer` 的 fail-open 降级为轮询。
 
 | 类（`hash` 包） | 作用 |
 |---|---|
@@ -46,7 +46,7 @@
 |---|---|
 | `loadbalance/LoadBalancePolicy` / `LoadBalanceGovernanceConfig` | governance policy 模型（record），`LoadBalanceStrategy`/`HashKeySource` 是配套枚举 |
 | `loadbalance/LoadBalancePolicyRepository` | 监听 Nacos governance，维护按 serviceId 索引的 policy 快照，全局唯一实例，在 `AegisLoadBalancerAutoConfiguration` 注册 |
-| `loadbalance/ConsistentHashReactiveLoadBalancer` | `ReactorServiceInstanceLoadBalancer` 实现（必须是这个更具体的子接口——SCG 按此类型查找 Bean，只实现上层 `ReactiveLoadBalancer` 会导致查找失败、SCG 默认 `RoundRobinLoadBalancer` 静默继续生效），按 serviceId 装配在 `AegisNamespaceLoadBalancerClientConfiguration` 中；内部持有 `RoundRobinLoadBalancer` 作为"policy 未配置"和"key 缺失降级"两种场景的统一委托对象；环用 Caffeine `Cache<String, ConsistentHashRing>`（`maximumSize(2)`）按实例集合+权重+虚拟节点数缓存，避免每次请求重建 |
+| `loadbalance/ConsistentHashReactiveLoadBalancer` | `ReactorServiceInstanceLoadBalancer` 实现（必须是这个更具体的子接口——SCG 按此类型查找 Bean，只实现上层 `ReactiveLoadBalancer` 会导致查找失败、SCG 默认 `RoundRobinLoadBalancer` 静默继续生效），按 serviceId 装配在 `AegisNamespaceLoadBalancerClientConfiguration` 中；内部持有 `RoundRobinLoadBalancer` 作为"policy 未配置"和"key 缺失降级"两种场景的统一委托对象；环用 Caffeine `Cache<String, ConsistentHashRing>`（`maximumSize(2)`）按实例集合+权重+虚拟节点数缓存，避免每次请求重建；`ConsistentHashRing` 内部只存 `identity`（host:port）不存 `ServiceInstance` 对象，路由后按 identity 回到本次 `supplier.get()` 返回的最新实例列表里查找——若直接缓存 `ServiceInstance` 对象，secure/metadata 等未参与 cache key 的字段（如 namespace）变化时会返回陈旧数据 |
 | `loadbalance/HashKeyMissingLogger` | 按 serviceId 限流的 WARN 日志（默认 30s 窗口），key 缺失降级时提示配置可能有误 |
 
 `AegisFilterOrder.LOAD_BALANCER = 10100` 仍然是预留但从未使用的顺序常量——一致性哈希是通过标准 `ReactiveLoadBalancer` 扩展点接入的（与命名空间感知 Supplier 同一挂载方式），不依赖这个 Filter 顺序常量，本次改动也没有采用它。

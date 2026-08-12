@@ -110,6 +110,20 @@ class LoadBalancePolicyRepositoryTest {
     }
 
     @Test
+    void shouldRejectVirtualNodesPerWeightAboveMaxAndRetainPreviousSnapshot() {
+        governanceListener.accept(STABLE_SNAPSHOT_JSON);
+
+        governanceListener.accept("""
+                {"loadBalancePolicies":[
+                  {"serviceId":"broken","strategy":"CONSISTENT_HASH","keySource":"CLIENT_IP","virtualNodesPerWeight":100001}
+                ]}
+                """);
+
+        assertThat(repository.findByServiceId("stable")).isPresent();
+        assertThat(repository.findByServiceId("broken")).isEmpty();
+    }
+
+    @Test
     void findByServiceId_shouldReturnEmpty_forBlankOrUnknownServiceId() {
         governanceListener.accept(STABLE_SNAPSHOT_JSON);
 
