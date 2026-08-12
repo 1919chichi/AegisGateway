@@ -270,7 +270,7 @@ git commit -m "feat(loadbalancer): add hand-written MurmurHash3 x86_32 implement
   - `public Optional<ServiceInstance> route(String key)`
   - `public static double resolveWeight(ServiceInstance instance)`（Task 7 的 `ConsistentHashReactiveLoadBalancer.buildCacheKey` 会复用这个方法，避免在两处重复解析 `"nacos.weight"` metadata）
 
-- [ ] **Task 2 Step 1: 写失败测试（虚拟节点数按权重比例分配 + 相同 key 稳定路由 + 空实例列表）**
+- [x] **Task 2 Step 1: 写失败测试（虚拟节点数按权重比例分配 + 相同 key 稳定路由 + 空实例列表）**
 
 创建 `gateway-loadbalancer/src/test/java/io/aegis/gateway/loadbalancer/hash/ConsistentHashRingTest.java`：
 
@@ -375,12 +375,12 @@ class ConsistentHashRingTest {
 }
 ```
 
-- [ ] **Task 2 Step 2: 运行测试确认失败**
+- [x] **Task 2 Step 2: 运行测试确认失败**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.hash.ConsistentHashRingTest"`
 Expected: 编译失败（`ConsistentHashRing` 类不存在）
 
-- [ ] **Task 2 Step 3: 实现 ConsistentHashRing**
+- [x] **Task 2 Step 3: 实现 ConsistentHashRing**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/ConsistentHashRing.java`：
 
@@ -490,12 +490,12 @@ public final class ConsistentHashRing {
 }
 ```
 
-- [ ] **Task 2 Step 4: 运行测试确认通过**
+- [x] **Task 2 Step 4: 运行测试确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.hash.ConsistentHashRingTest"`
 Expected: PASS（4 个测试全部通过）
 
-- [ ] **Task 2 Step 5: Commit**
+- [x] **Task 2 Step 5: Commit**
 
 ```bash
 git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/ConsistentHashRing.java \
