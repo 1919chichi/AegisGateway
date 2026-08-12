@@ -2,6 +2,7 @@
 change: add-consistent-hash-loadbalancer
 design-doc: docs/superpowers/specs/2026-08-12-consistent-hash-loadbalancer-design.md
 base-ref: bdb48a6ab57c8b3a49c03f2398c5c1ae6d2f8759
+archived-with: 2026-08-12-add-consistent-hash-loadbalancer
 ---
 
 # 一致性哈希负载均衡 实施计划
@@ -88,6 +89,7 @@ gateway-loadbalancer/CLAUDE.md                              [改] 记录新能�
 docs/rules/architecture-overview.md                          [改] gateway-loadbalancer 一行描述
 ```
 
+archived-with: 2026-08-12-add-consistent-hash-loadbalancer
 ---
 
 ## Task 1: `hash.MurmurHash3` —— 手写哈希函数
@@ -255,6 +257,7 @@ git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/Mu
 git commit -m "feat(loadbalancer): add hand-written MurmurHash3 x86_32 implementation"
 ```
 
+archived-with: 2026-08-12-add-consistent-hash-loadbalancer
 ---
 
 ## Task 2: `hash.ConsistentHashRing` —— 哈希环 + 虚拟节点 + 权重
@@ -503,6 +506,7 @@ git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/Co
 git commit -m "feat(loadbalancer): add ConsistentHashRing with weighted virtual nodes"
 ```
 
+archived-with: 2026-08-12-add-consistent-hash-loadbalancer
 ---
 
 ## Task 3: `loadbalance` 包 —— governance policy 模型（枚举 + record）
@@ -635,6 +639,7 @@ git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbal
 git commit -m "feat(loadbalancer): add load balance governance policy models"
 ```
 
+archived-with: 2026-08-12-add-consistent-hash-loadbalancer
 ---
 
 ## Task 4: `hash.HashKeyExtractor` —— key 提取
@@ -842,6 +847,7 @@ git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/hash/Ha
 git commit -m "feat(loadbalancer): add HashKeyExtractor for CLIENT_IP/HEADER key sources"
 ```
 
+archived-with: 2026-08-12-add-consistent-hash-loadbalancer
 ---
 
 ## Task 5: `loadbalance.LoadBalancePolicyRepository` —— 监听 Nacos，维护 policy 快照
@@ -1114,6 +1120,7 @@ git add gateway-loadbalancer/build.gradle \
 git commit -m "feat(loadbalancer): add LoadBalancePolicyRepository backed by Nacos governance"
 ```
 
+archived-with: 2026-08-12-add-consistent-hash-loadbalancer
 ---
 
 ## Task 6: `loadbalance.HashKeyMissingLogger` —— 按 serviceId 限流的 WARN 日志
@@ -1270,6 +1277,7 @@ git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbal
 git commit -m "feat(loadbalancer): add throttled WARN logging for missing hash keys"
 ```
 
+archived-with: 2026-08-12-add-consistent-hash-loadbalancer
 ---
 
 ## Task 7: `loadbalance.ConsistentHashReactiveLoadBalancer` —— 核心 LB 实现
@@ -1647,6 +1655,7 @@ git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbal
 git commit -m "feat(loadbalancer): add ConsistentHashReactiveLoadBalancer"
 ```
 
+archived-with: 2026-08-12-add-consistent-hash-loadbalancer
 ---
 
 ## Task 8: Bean 装配
@@ -1866,6 +1875,7 @@ git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/config/
 git commit -m "feat(loadbalancer): wire ConsistentHashReactiveLoadBalancer into bean assembly"
 ```
 
+archived-with: 2026-08-12-add-consistent-hash-loadbalancer
 ---
 
 ## Task 9: 文档同步
@@ -1942,6 +1952,7 @@ git add gateway-loadbalancer/CLAUDE.md docs/rules/architecture-overview.md
 git commit -m "docs(loadbalancer): document consistent hash load balancing capability"
 ```
 
+archived-with: 2026-08-12-add-consistent-hash-loadbalancer
 ---
 
 ## 自动化任务完成后的整体验证
@@ -1951,6 +1962,7 @@ git commit -m "docs(loadbalancer): document consistent hash load balancing capab
 - [x] Run: `./gradlew :gateway-server:bootJar`
       Expected: BUILD SUCCESSFUL（确认新增代码不破坏整体编译，`gateway-server` 依赖 `gateway-loadbalancer`）
 
+archived-with: 2026-08-12-add-consistent-hash-loadbalancer
 ---
 
 ## 端到端手动验证（可选，需本地 Nacos，不属于自动化测试范围）

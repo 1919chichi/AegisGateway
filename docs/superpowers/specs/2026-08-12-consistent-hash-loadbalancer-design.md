@@ -2,6 +2,8 @@
 comet_change: add-consistent-hash-loadbalancer
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-08-12-add-consistent-hash-loadbalancer
+status: final
 ---
 
 # 一致性哈希负载均衡设计文档
