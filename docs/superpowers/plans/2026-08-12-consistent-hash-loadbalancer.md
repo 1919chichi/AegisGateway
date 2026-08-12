@@ -1877,7 +1877,7 @@ git commit -m "feat(loadbalancer): wire ConsistentHashReactiveLoadBalancer into 
 **Interfaces:**
 - 无代码接口，纯文档任务
 
-- [ ] **Task 9 Step 1: 更新 gateway-loadbalancer/CLAUDE.md**
+- [x] **Task 9 Step 1: 更新 gateway-loadbalancer/CLAUDE.md**
 
 在 `gateway-loadbalancer/CLAUDE.md` 的"关键类"表格后、"命名空间感知发现机制"章节前，插入一个新的二级章节（保留文件其余内容不变）：
 
@@ -1921,7 +1921,7 @@ git commit -m "feat(loadbalancer): wire ConsistentHashReactiveLoadBalancer into 
 `AegisFilterOrder.LOAD_BALANCER = 10100` 仍然是预留但从未使用的顺序常量——一致性哈希是通过标准 `ReactiveLoadBalancer` 扩展点接入的（与命名空间感知 Supplier 同一挂载方式），不依赖这个 Filter 顺序常量，本次改动也没有采用它。
 ```
 
-- [ ] **Task 9 Step 2: 更新 docs/rules/architecture-overview.md**
+- [x] **Task 9 Step 2: 更新 docs/rules/architecture-overview.md**
 
 在 `docs/rules/architecture-overview.md` 的模块职责表格中，把：
 
@@ -1935,7 +1935,7 @@ git commit -m "feat(loadbalancer): wire ConsistentHashReactiveLoadBalancer into 
 | `gateway-loadbalancer` | 基于 Nacos + Spring Cloud LoadBalancer 的服务发现负载均衡；支持按服务粒度可选启用一致性哈希策略（会话保持） |
 ```
 
-- [ ] **Task 9 Step 3: Commit**
+- [x] **Task 9 Step 3: Commit**
 
 ```bash
 git add gateway-loadbalancer/CLAUDE.md docs/rules/architecture-overview.md
