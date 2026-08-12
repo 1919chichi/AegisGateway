@@ -1282,7 +1282,7 @@ git commit -m "feat(loadbalancer): add throttled WARN logging for missing hash k
 - Consumes: `ConsistentHashRing`/`ConsistentHashRing.resolveWeight()`（Task 2）、`HashKeyExtractor`/`DefaultHashKeyExtractor`（Task 4）、`LoadBalancePolicyRepository`（Task 5）、`HashKeyMissingLogger`（Task 6）
 - Produces: `public ConsistentHashReactiveLoadBalancer(ObjectProvider<ServiceInstanceListSupplier> supplierProvider, String serviceId, LoadBalancePolicyRepository policyRepository)`，实现 `ReactiveLoadBalancer<ServiceInstance>`（Task 8 的 Bean 装配会 `new` 这个类）
 
-- [ ] **Task 7 Step 1: 写失败测试（无 policy → 委托轮询；policy+key → 稳定路由）**
+- [x] **Task 7 Step 1: 写失败测试（无 policy → 委托轮询；policy+key → 稳定路由）**
 
 创建 `gateway-loadbalancer/src/test/java/io/aegis/gateway/loadbalancer/loadbalance/ConsistentHashReactiveLoadBalancerTest.java`（先写前两个场景）：
 
@@ -1502,12 +1502,12 @@ class ConsistentHashReactiveLoadBalancerTest {
 }
 ```
 
-- [ ] **Task 7 Step 2: 运行测试确认失败**
+- [x] **Task 7 Step 2: 运行测试确认失败**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.loadbalance.ConsistentHashReactiveLoadBalancerTest"`
 Expected: 编译失败（`ConsistentHashReactiveLoadBalancer` 不存在，且缺少测试构造器）
 
-- [ ] **Task 7 Step 3: 实现 ConsistentHashReactiveLoadBalancer**
+- [x] **Task 7 Step 3: 实现 ConsistentHashReactiveLoadBalancer**
 
 创建 `gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/ConsistentHashReactiveLoadBalancer.java`：
 
@@ -1634,12 +1634,12 @@ public class ConsistentHashReactiveLoadBalancer implements ReactiveLoadBalancer<
 }
 ```
 
-- [ ] **Task 7 Step 4: 运行测试确认通过**
+- [x] **Task 7 Step 4: 运行测试确认通过**
 
 Run: `./gradlew :gateway-loadbalancer:test --tests "io.aegis.gateway.loadbalancer.loadbalance.ConsistentHashReactiveLoadBalancerTest"`
 Expected: PASS（7 个测试全部通过）
 
-- [ ] **Task 7 Step 5: Commit**
+- [x] **Task 7 Step 5: Commit**
 
 ```bash
 git add gateway-loadbalancer/src/main/java/io/aegis/gateway/loadbalancer/loadbalance/ConsistentHashReactiveLoadBalancer.java \
